@@ -1,0 +1,19 @@
+---
+name: setup
+description: "Set up Tickover: install the daemon, log in with GitHub, show the consent text, and write the status line with a backup."
+---
+
+You are setting up Tickover for this developer. Do these steps in order. Stop and report if any step fails.
+
+1. Check Node: run `node --version`. Require 22.13 or newer; if older, tell the developer to upgrade Node and stop.
+2. Install the daemon: run `npm install -g tickover-cli@0.1.0`. The package is `tickover-cli`; the command it installs is `tickover`. Then run `tickover register` and note the printed path; it is now recorded in `~/.tickover/config.json` as `daemonBin` so hooks can start the daemon.
+3. Show this consent text verbatim and ask the developer to confirm with AskUserQuestion (options: "I agree, continue" / "Stop"). Do not continue without "I agree, continue".
+
+   Tickover will send to its server: your GitHub id (from login), your operating system, the Claude Code version, when each turn starts and stops, counts of file extensions in your project directory (for example "typescript: 40"), and your answers with how long you took and where you answered them (terminal pane, local page, VS Code, or inside Claude Code). Derived on our side, not sent by the plugin: your country, from the IP address of the request, and an activity tier from how many turns you run a week (light under 5, regular 5 to 20, heavy over 20). Buyers can target on both. It will never send prompts, file contents, file paths, repository names, repository owners, or transcripts. Paid questions always show the sponsor and the amount. You can remove everything with /tickover:uninstall. The same three lists, and what happens to them if you delete your account, are at https://tickover.dev/privacy.
+
+4. Log in: run `tickover login`. Relay the URL and the one-time code it prints to the developer and wait for the command to finish. It succeeds only when it exits 0 *and* prints "Logged in as <github login>". Any other ending means nobody is logged in: a non-zero exit is a closed account ("This GitHub account cannot be used with Tickover" — deleted or banned, and re-running this will not change it), and a zero exit saying the code expired or timed out means the developer never completed the GitHub step. Stop and report in every one of those cases. Do not go on to step 5, which rewrites the developer's `~/.claude/settings.json`.
+5. Back up and write the status line:
+   - Read `~/.claude/settings.json` (create `{}` if missing). If it has a `statusLine` value, copy it verbatim into `~/.tickover/statusline-backup.json` and also set `wrappedStatusLine` in `~/.tickover/config.json` to that exact object when its `type` is `command`.
+   - Set `statusLine` to `{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/statusline/statusline.mjs\"", "refreshInterval": 3 }` (the plugin root is already an absolute path here). Keep every other key in settings.json unchanged.
+6. Start the daemon now: run `tickover status`; it starts the daemon if needed and prints health. Confirm `loggedIn: true`.
+7. Tell the developer: questions appear in the status line while Claude works, at most 10 paid per day; answer with `tickover pane` in a split terminal, with the localhost page (`tickover page` prints its URL and opens it in the browser — the URL carries the daemon token, which is why `tickover status` does not print it), or with the Tickover VS Code extension. If this Claude Code has function hooks (Mods) enabled, the question also appears above the prompt and a number key answers it. Note that the extension needs the daemon on the same machine as the editor, so it will report "daemon off" in VS Code Remote, WSL and Codespaces — use the pane or the page there. Remind them the change takes effect on the next Claude Code start.

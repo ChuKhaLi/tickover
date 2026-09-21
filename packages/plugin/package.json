@@ -1,0 +1,19 @@
+{
+  "name": "@tickover/plugin",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "pretest": "pnpm --filter @tickover/contract build",
+    "test": "vitest run",
+    "test:mod": "node scripts/test-mod.mjs",
+    "validate": "claude plugin validate . --strict"
+  },
+  "//": "@tickover/contract is a devDependency and nothing shipped imports it: the hook and status-line scripts stay plain .mjs, and hooks/band.tsx is loaded as source by Claude Code, so nothing here has a build step or node_modules. The contract is here so test/consent.spec.ts can hold the consent screen to the spec 5.5 lists the web pages render, and pretest builds it because the package resolves dist/, not source (CLAUDE.md trap 2). test:mod needs a claude with function hooks and is not part of pnpm test (trap 4).",
+  "devDependencies": {
+    "@tickover/contract": "workspace:*",
+    "@types/node": "^22.10.0",
+    "typescript": "^5.6.3",
+    "vitest": "^3.2.4"
+  }
+}

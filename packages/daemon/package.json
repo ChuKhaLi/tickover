@@ -1,0 +1,32 @@
+{
+  "name": "tickover-cli",
+  "version": "0.1.0",
+  "description": "Earn while Claude thinks: paid one-question surveys in the idle window. Local daemon and CLI.",
+  "license": "MIT",
+  "repository": { "type": "git", "url": "git+https://github.com/ChuKhaLi/tickover.git", "directory": "packages/daemon" },
+  "homepage": "https://tickover.dev",
+  "type": "module",
+  "bin": { "tickover": "./dist/cli.js" },
+  "files": ["dist", "README.md", "LICENSE"],
+  "engines": { "node": ">=22.13" },
+  "publishConfig": { "access": "public" },
+  "scripts": {
+    "prebuild": "pnpm --filter @tickover/contract build",
+    "build": "tsup",
+    "pretypecheck": "pnpm --filter @tickover/contract build",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "pretest": "pnpm --filter @tickover/contract build && tsup",
+    "test": "vitest run",
+    "prepublishOnly": "pnpm run test",
+    "dev": "tsup --watch"
+  },
+  "devDependencies": {
+    "@tickover/contract": "workspace:*",
+    "@types/node": "^22.10.0",
+    "string-width": "^7.2.0",
+    "tsup": "^8.5.1",
+    "typescript": "^5.6.3",
+    "vitest": "^3.2.4",
+    "zod": "^3.23.8"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "tickover",
+  "displayName": "Tickover",
+  "version": "0.1.0",
+  "description": "Earn while Claude thinks: one paid, single-choice question in the status line while Claude works. Open source, no self-updater, never reads prompts or files.",
+  "author": { "name": "Tickover", "url": "https://github.com/ChuKhaLi/tickover" },
+  "repository": "https://github.com/ChuKhaLi/tickover",
+  "license": "MIT",
+  "keywords": ["earn", "survey", "status-line", "idle"],
+  "skills": "./skills/"
+}

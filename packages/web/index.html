@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <!-- Landing defaults; each route's own head is written at build time. -->
+    <title>Tickover — Earn while Claude thinks</title>
+    <base href="/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="One paid, single-choice question in the idle window of your AI coding tool. $1.00 per response to the buyer; the developer keeps 50%."
+    />
+    <meta property="og:title" content="Tickover — Earn while Claude thinks" />
+    <meta
+      property="og:description"
+      content="One paid, single-choice question in the idle window of your AI coding tool. $1.00 per response to the buyer; the developer keeps 50%."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://tickover.dev/" />
+    <meta name="twitter:card" content="summary" />
+    <!-- Without this every page load asks for /favicon.ico and gets the SPA shell
+         with an HTML content type, which the browser logs as a failed icon. The
+         file is `public/favicon.ico`, copied verbatim into the build output. -->
+    <link rel="icon" href="/favicon.ico" sizes="16x16 32x32" />
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <mw-root></mw-root>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

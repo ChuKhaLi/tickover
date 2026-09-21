@@ -1,0 +1,14 @@
+{
+  // `@analogjs/vite-plugin-angular` resolves a tsconfig next to the Storybook config
+  // and fails the build without one, naming the path it looked for. Extending the
+  // app's base rather than declaring a second set of compiler options is the point:
+  // the workshop compiles the components under the same strictness the application
+  // does, so a story cannot be the thing that makes a component look compilable.
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "../out-tsc/storybook",
+    "types": ["node"]
+  },
+  "include": ["../src/**/*.ts", "./*.ts"],
+  "exclude": ["../src/**/*.spec.ts", "../src/main.server.ts"]
+}

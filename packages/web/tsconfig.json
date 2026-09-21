@@ -1,0 +1,38 @@
+{
+  "compileOnSave": false,
+  "compilerOptions": {
+    "ignoreDeprecations": "6.0",
+    "baseUrl": "./",
+    "outDir": "./dist/out-tsc",
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "sourceMap": true,
+    "declaration": false,
+    "downlevelIteration": true,
+    "experimentalDecorators": true,
+    "moduleResolution": "bundler",
+    "isolatedModules": true,
+    "importHelpers": true,
+    "target": "ES2022",
+    "module": "ES2022",
+    // "dom.iterable" is a no-op on this toolchain and is declared anyway. Measured:
+    // with and without it, `for (const el of root.querySelectorAll("a"))` compiles,
+    // because TypeScript 6 folded the iterable declarations into lib.dom.d.ts (46
+    // [Symbol.iterator] members there; TS 5.9 has 0 and keeps them in
+    // lib.dom.iterable.d.ts). This package resolves 6.0.3. Declaring it says what the
+    // code relies on rather than depending on which minor the compiler is at.
+    "lib": ["ES2022", "dom", "dom.iterable"],
+    "useDefineForClassFields": false,
+    "skipLibCheck": true
+  },
+  "angularCompilerOptions": {
+    "enableI18nLegacyMessageIdFormat": false,
+    "strictInjectionParameters": true,
+    "strictInputAccessModifiers": true,
+    "strictTemplates": true
+  }
+}

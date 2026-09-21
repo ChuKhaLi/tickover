@@ -1,0 +1,25 @@
+.worktrees/
+.superpowers/
+node_modules/
+dist/
+coverage/
+.env
+*.log
+test-results/
+playwright-report/
+# `pnpm --filter tickover-vscode package` writes the .vsix beside package.json, and
+# nothing removed it: the next `git add -A` would commit a 29 KB build artifact.
+*.vsix
+blob-report/
+out-tsc/
+# `claude -p /plugin-types` writes these for packages/plugin's test:mod; they list this machine's
+# own MCP tools and change with every Claude Code release. `**/` is required: a pattern with a
+# slash anywhere but the end is anchored to the directory holding this .gitignore (the repo root),
+# and these are written under packages/plugin/, not there.
+**/.claude/types/
+# Storybook's build output. `build-storybook` writes it beside package.json, the
+# same trap the .vsix line above records.
+storybook-static/
+
+# Playwright MCP session artefacts (page snapshots, console logs)
+.playwright-mcp/

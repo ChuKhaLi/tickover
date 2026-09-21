@@ -1,0 +1,44 @@
+{
+  "name": "tickover-vscode",
+  "displayName": "Tickover",
+  "description": "Answer one paid question while Claude works. Companion to the tickover daemon.",
+  "version": "0.1.0",
+  "publisher": "tickover",
+  "license": "MIT",
+  "repository": { "type": "git", "url": "git+https://github.com/ChuKhaLi/tickover.git", "directory": "packages/vscode" },
+  "homepage": "https://tickover.dev",
+  "private": true,
+  "engines": { "vscode": "^1.90.0" },
+  "categories": ["Other"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      { "command": "tickover.answer", "title": "Tickover: Answer the current question" },
+      { "command": "tickover.skip", "title": "Tickover: Skip the current question" },
+      { "command": "tickover.openPage", "title": "Tickover: Open the answer page" }
+    ]
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "pretest": "pnpm --filter @tickover/contract build && tsup",
+    "test": "vitest run",
+    "test:e2e": "vscode-test",
+    "package": "vsce package --no-dependencies"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@tickover/contract": "workspace:*",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^22.10.0",
+    "@types/vscode": "^1.90.0",
+    "@vscode/test-cli": "^0.0.11",
+    "@vscode/test-electron": "^2.5.2",
+    "@vscode/vsce": "^3.6.0",
+    "string-width": "^7.2.0",
+    "tsup": "^8.5.1",
+    "typescript": "^5.6.3",
+    "vitest": "^3.2.4"
+  }
+}

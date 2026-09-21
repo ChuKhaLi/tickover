@@ -1,0 +1,326 @@
+@import "tailwindcss";
+/* The faces, self-hosted. Not a font CDN, and the reason is the product's own
+   pitch: `/privacy` enumerates every third party that touches a request, and a
+   page that phones a font host on load contradicts it. These resolve out of
+   `node_modules` at build time, so the bytes that ship are in `dist/`.
+
+   `wght` rather than `standard` for the sans: it carries the weight axis alone,
+   which is all the three weights this system uses need, and its latin file is
+   45,712 bytes against standard's 65,488.
+
+   Each of these rules carries a `unicode-range`, so a browser downloads only the
+   subsets the page actually uses -- the whole set is never fetched. The vietnamese
+   subsets are deliberate rather than incidental, and for the same reason R310 kept
+   the emoji faces: sponsor names and study titles are strings a buyer types, spec
+   4.7 requires the sponsor shown with every paid question, and this is a product
+   built in Vietnam. Mono gets them too, because the replica renders the sponsor
+   name in mono. */
+@import "@fontsource-variable/ibm-plex-sans/wght.css";
+@import "@fontsource/ibm-plex-mono/latin-400.css";
+@import "@fontsource/ibm-plex-mono/latin-600.css";
+@import "@fontsource/ibm-plex-mono/vietnamese-400.css";
+@import "@fontsource/ibm-plex-mono/vietnamese-600.css";
+/* Tailwind 4 auto-detects sources, and its scanner mints a utility from any
+   matching word — in comments, and in documentation, which is where `.invisible`,
+   `.fixed`, `.table`, `.relative` and `.filter` came from. Nothing below here is
+   shipped markup, so all five sources are excluded: the five lines cover, in order,
+   specs under `src`, specs under `test`, every build script under `scripts`, the
+   Playwright suite under `e2e`, and the markdown at the package root.
+
+   The last two cover the package root itself, which the first five do not: `vite.config.ts`
+   carries `static: true` and `package.json` a `tsx e2e/static-server.ts` script, and between them
+   they minted `.static{position:static}` into the shipped bundle. Pre-existing -- the branch
+   review found it by extracting all 243 class selectors from the emitted sheet and testing each
+   against every file under `src`; 82 did not match, 81 of those being numeric fragments of
+   `oklch()` values, and `static` was the only real name. `index.html` is *not* excluded: it is
+   shipped markup and Tailwind has to scan it.
+
+   All the exclusions are load-bearing — dropping one puts prose from that source back in the
+   bundle. Measured: +22 bytes for `scripts`, +50 for `e2e` (`.invisible`, `.table`),
+   and **+1,612 for `README.md` alone**, because a README full of `pnpm --filter`
+   mints `.filter`, which drags thirteen `@property` declarations in with it. That
+   one is worth knowing: the exclusions are not only about code comments, and the
+   next file added beside `package.json` needs the same treatment.
+
+   Each glob must be relative: the bare non-relative form is silently ignored. The
+   scan root is this package, not the repository, so the root `CLAUDE.md` — which is
+   also full of `pnpm --filter` — is not a source here. Keep glob patterns out of
+   this comment: one contains a comment terminator.
+
+   The check is the emitted byte count, not this list. Baseline after `rm -rf dist`:
+   **18,014 bytes, SHA-256 43d99bd1…f93b**, after the root exclusions removed
+   `.static{position:static}` -- exactly 24 bytes, and the rule-by-rule diff shows nothing
+   else moved. It was 18,038 (33e7b135…3dd3) before those, and 17,999 (b67aefb2…f691). It was 17,999 (b67aefb2…f691) before
+   the three spec §7 legal pages; the whole +39 is one rule, `.justify-center`,
+   which the shell footer uses -- measured by diffing the two stylesheets rule by
+   rule, not by trusting the total.
+
+   That count then went to 18,066 and came back. Two comments written in *shipped*
+   source -- "crawler-visible" and "a visible price" -- minted `.visible`, and the
+   byte count is what caught it. Both were reworded rather than excluded: these
+   exclusions are for trees that ship nothing, and `src/app` is not one.
+
+   One orphan in the bundle is deliberate: `.hidden`, minted from shipped copy (spec §4.7's
+   "a hidden sponsor") rather than from prose. Do not chase it. */
+@source not "./**/*.spec.ts";
+@source not "../test/**/*.spec.ts";
+@source not "../scripts/**/*.ts";
+@source not "../e2e/**/*.ts";
+@source not "../*.md";
+@source not "../*.ts";
+@source not "../*.json";
+@source not "./app/ui/*.stories.ts";
+@source not "../.storybook/*.ts";
+/* The design token layer. The reasoning, the measured contrast table and the
+   component specs live in `docs/design/design-system.md`, at the repository root
+   rather than in this package — deliberately. Tailwind mints a utility from any
+   matching English word in a file it scans, and a design system cannot be written
+   without the names of a dozen utilities. So the prose is kept outside the scan
+   root and only the declarations are here.
+
+   Two ramps, generated on the same lightness ladder Tailwind uses for its own
+   neutrals, so a token and a Tailwind colour land on the same perceived step:
+   `ink` is the neutral at hue 185, `signal` the accent at hue 190. The neutral
+   carries a faint cast of the accent's hue so the page and the accent read as one
+   system rather than grey plus a colour.
+
+   Values are hex, not oklch, and that is not a style preference. Six of the eleven
+   `signal` steps first came out beyond the sRGB gamut, where the hex is a *clipped*
+   approximation — so the colour a browser would paint from `oklch()` and the colour
+   that had been measured for contrast were two different colours. Storing the hex
+   takes the browser-side conversion out of the loop: what ships is what was
+   measured. The generating oklch is kept per line so the ramp can be regenerated.
+   Chroma tracks about 90% of the sRGB ceiling at each step rather than sitting on
+   it, so rounding cannot push a step back out.
+
+   `ink-500` is not a text colour: at #6D7573 on the page ground it measures 4.52,
+   which clears AA by 0.02 and is not a margin. Muted text is `ink-600`, at 7.21.
+   Every pair this system declares is asserted in `test/unit/tokens.spec.ts`.
+
+   There is no green here, and its absence is a decision (design system 3.4): money
+   is set in tabular mono in plain ink rather than coloured, and the ledger's five
+   entry types are types rather than sentiment. */
+@theme {
+  --color-ink-50: #F9FAFA;   /* oklch(0.985 0.002 185) */
+  --color-ink-100: #F2F5F4;  /* oklch(0.967 0.003 185) */
+  --color-ink-200: #E2E6E5;  /* oklch(0.922 0.005 185) */
+  --color-ink-300: #CFD6D5;  /* oklch(0.870 0.007 185) */
+  --color-ink-400: #9BA3A1;  /* oklch(0.708 0.009 185) */
+  --color-ink-500: #6D7573;  /* oklch(0.554 0.010 185) */
+  --color-ink-600: #4E5655;  /* oklch(0.446 0.010 185) */
+  --color-ink-700: #3B4241;  /* oklch(0.373 0.009 185) */
+  --color-ink-800: #242A29;  /* oklch(0.278 0.008 185) */
+  --color-ink-900: #151919;  /* oklch(0.210 0.007 185) */
+  --color-ink-950: #070A0A;  /* oklch(0.141 0.006 185) */
+
+  --color-signal-50: #EFFEFC;   /* oklch(0.985 0.016 190) */
+  --color-signal-100: #DBFCF9;  /* oklch(0.967 0.034 190) */
+  --color-signal-200: #B9F2EE;  /* oklch(0.922 0.058 190) */
+  --color-signal-300: #92E6E0;  /* oklch(0.870 0.082 190) */
+  --color-signal-400: #3EB6AF;  /* oklch(0.708 0.105 190) */
+  --color-signal-500: #22837E;  /* oklch(0.554 0.086 190) */
+  --color-signal-600: #15605D;  /* oklch(0.446 0.070 190) */
+  --color-signal-700: #0F4A47;  /* oklch(0.373 0.058 190) */
+  --color-signal-800: #062F2D;  /* oklch(0.278 0.044 190) */
+  --color-signal-900: #031D1C;  /* oklch(0.210 0.033 190) */
+  --color-signal-950: #000C0B;  /* oklch(0.141 0.023 190) */
+
+  /* A study's lifecycle is drawn as a chip plus its place in a five-step track, so
+     these only have to be distinguishable, not carry the sequence on their own.
+     `live` uses the accent on purpose: live is the state a buyer acts on -- and it
+     needs no dark twin at all, because the accent fill reads in both themes exactly
+     as the primary button does.
+
+     Each tinted state has a `-bg-dark` and an `-edge-dark`, and the second of those
+     is the one worth knowing about. The obvious inversion is to reuse the light
+     `-fg` as the dark edge. Measured on the dark page, it fails every time: amber
+     2.50, red 2.74, indigo 1.78, against the 3.0 a boundary that carries meaning
+     needs. Three for three, so it is a rule rather than three accidents -- a colour
+     dark enough to be readable *on* a pale tint is never bright enough to be an edge
+     *against* a dark ground. Each `-edge-dark` is the first step above that bar and
+     no brighter: 3.53, 3.67, 3.97. */
+  --color-review-fg: #92400E;
+  --color-review-bg: #FEF3C7;
+  --color-review-edge: #FDE68A;
+  /* The amber pair inverted for the dark ground. The edge is not `review-fg`
+     reused: at #92400E on the dark page it measures 2.50, under the 3.0 a boundary
+     that carries meaning needs, so it is lifted one step. It stops at #B45309
+     rather than going brighter because #D97706 is the warm-clay tone that reads as
+     a generated page's default accent, and the measurement did not require it. */
+  --color-review-bg-dark: #2A1A05;
+  --color-review-edge-dark: #B45309;
+  --color-settled-fg: #3730A3;
+  --color-settled-bg: #E7E7FB;
+  --color-settled-edge: #C7C5F4;
+  --color-settled-bg-dark: #1A1840;
+  --color-settled-edge-dark: #6366F1;
+  --color-rejected-fg: #B91C1C;
+  --color-rejected-bg: #FEE2E2;
+  --color-rejected-edge: #FECACA;
+  /* The hovered destructive fill. Darker rather than lighter, which is the
+     opposite of what `primary` does: a primary invites the next press, and this one
+     should not get easier to hit as the pointer settles on it. White on it is 8.31. */
+  --color-rejected-fg-hover: #991B1B;
+  /* The red pair inverted for the dark ground, and it exists because looking at the
+     workshop caught what the pair table had not been asked. The error banner had no
+     dark fill of its own and borrowed `ink-800`, so the most urgent tone rendered on
+     the same neutral ground as the least urgent one while `done` and `warn` both had
+     tinted fills. And the edge reused `rejected-fg`, which on the dark page measures
+     **2.74** -- under the 3.0 a boundary that carries meaning needs, the same defect
+     the amber edge had, missed here because no pair named it. Lifted to the first
+     step that clears: 3.67. */
+  --color-rejected-bg-dark: #2A1212;
+  --color-rejected-edge-dark: #DC2626;
+
+  /* One family, two voices: the sans is what the interface says, the mono what the
+     machine says. Self-hosted when the faces land — not a font CDN. A product whose
+     pitch is that it never reads your prompts or files, and whose privacy page
+     enumerates every third party touching a request, cannot phone a font host on
+     load. Until they are self-hosted these stacks resolve to the system faces,
+     which is why the fallbacks are real rather than a bare `sans-serif`. */
+  /* The emoji faces are not decoration and are not Tailwind boilerplate carried over
+     by habit: sponsor names and study titles are strings a buyer types, and spec 4.7
+     requires the sponsor to be shown with every paid question. Overriding this
+     namespace without them measured 90 bytes smaller and put a tofu box in reach of
+     any sponsor name containing an emoji. "Liberation Mono" is kept for the same
+     reason on Linux, where the replica of the status line should fall back to a real
+     terminal face rather than to a proportional one. */
+  /* "IBM Plex Sans Variable" is first because that is the family name the variable
+     `@font-face` actually declares -- asking for "IBM Plex Sans" alone matches
+     nothing we ship and falls silently back to the system face, which looks close
+     enough that nothing would have failed. The static name stays behind it for
+     anyone who has the family installed, and `e2e/public.spec.ts` asserts in a real
+     browser that the face resolved, because only a browser can tell. */
+  --font-sans: "IBM Plex Sans Variable", "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --font-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, "Liberation Mono", monospace, "Apple Color Emoji", "Segoe UI Emoji";
+
+  /* The type scale, one token per role rather than three utilities per heading.
+     Design system 4 sets size, line height and tracking together for each role, and
+     splitting them across a size utility, a leading utility and a tracking utility is
+     how a scale drifts: two of the three get copied and the third is forgotten. A role
+     token carries all three, so a heading is one name.
+
+     `h1-app` replaces the two stock steps the app screens were split between -- 14 at
+     the smaller, 6 at the one above it -- with a single name at the larger size. The
+     roles nothing uses yet cost no bytes: the same property the colour ramps rely on,
+     measured rather than assumed.
+
+     This comment used to name those two steps, and naming them is what kept them in
+     the emitted sheet long after the last screen stopped asking for either (R47).
+     Tailwind scans this file too. */
+  --text-display: clamp(2.5rem, 5vw, 3.75rem);
+  --text-display--line-height: 1.05;
+  --text-display--letter-spacing: -0.022em;
+  --text-display--font-weight: 600;
+  --text-h1-public: 2.25rem;
+  --text-h1-public--line-height: 1.15;
+  --text-h1-public--letter-spacing: -0.018em;
+  --text-h1-public--font-weight: 600;
+  --text-h1-app: 1.875rem;
+  --text-h1-app--line-height: 1.2;
+  --text-h1-app--letter-spacing: -0.014em;
+  --text-h1-app--font-weight: 600;
+  --text-h2: 1.5rem;
+  --text-h2--line-height: 1.3;
+  --text-h2--letter-spacing: -0.01em;
+  --text-h2--font-weight: 600;
+  --text-h3: 1.25rem;
+  --text-h3--line-height: 1.35;
+  --text-h3--letter-spacing: -0.006em;
+  --text-h3--font-weight: 600;
+  /* One per page, under the h1. */
+  --text-lead: 1.125rem;
+  --text-lead--line-height: 1.55;
+  --text-body: 1rem;
+  --text-body--line-height: 1.55;
+  /* Cells and notes. */
+  --text-small: 0.875rem;
+  --text-small--line-height: 1.45;
+  /* Chips and column heads. Not upper-cased: design system 4 lists ALL-CAPS eyebrow
+     labels among the three treatments this system refuses. */
+  --text-caption: 0.75rem;
+  --text-caption--line-height: 1.4;
+  --text-caption--letter-spacing: 0.004em;
+  --text-caption--font-weight: 500;
+
+  /* Radius encodes rank rather than being one value everywhere: it grows with how
+     much the element contains. The replica of the status line is square inside,
+     because terminals are. */
+  --radius-chip: 3px;
+  --radius-control: 6px;
+  --radius-card: 10px;
+  --radius-overlay: 14px;
+  --radius-pane: 8px;
+
+  /* Section 5's measure for app content, which the shell had been approximating with
+     Tailwind's `5xl` (1024px) for the whole of this design's life. The 96px between
+     them is exactly what the landing hero's own control needs: at its top budget of
+     120 columns the replica is 1008px of character cells, so inside 992px of content
+     it was clipped on every screen made, a 1920px monitor included, with 900px of
+     page unused on either side. Prose is unaffected -- it is capped at 68ch and does
+     not reach this (section 4). */
+  --container-content: 1120px;
+}
+/* The character cell, drawn. Design system 1 says structure here comes from the cell
+   and not from a 12-column layout, and behind the hero it stops describing that and
+   draws it: a 9x21px hairline lattice, which is one character of the mono face at the
+   size the replica sets it. It is the page's only texture, it ends at the hero band's
+   lower edge so it never sits under a price list, and it is deliberately not a
+   gradient wash -- the decorative default it exists instead of (R318).
+
+   Measured: ink-200 on ink-50 is 1.20, ink-800 on ink-900 is 1.21. Both are under the
+   3.0 a boundary needs and over the 1.0 a decoration is allowed, which is the correct
+   bar: this carries no meaning and must not read as an edge.
+
+   Plain CSS rather than a utility because it is one rule with two custom properties
+   and a dark twin, and writing it as a utility would put a second dialect of the same
+   thing in the source. The two tokens it names are painted by utilities elsewhere, so
+   they reach the sheet on their own account; if that ever stops being true this rule
+   resolves to nothing and the texture silently leaves, which `styles.spec.ts` would
+   see as a byte delta and `e2e/public.spec.ts` asserts against directly. */
+.mw-lattice {
+  background-image:
+    linear-gradient(to right, var(--color-ink-200) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--color-ink-200) 1px, transparent 1px);
+  background-size: 9px 21px;
+}
+@media (prefers-color-scheme: dark) {
+  .mw-lattice {
+    background-image:
+      linear-gradient(to right, var(--color-ink-800) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--color-ink-800) 1px, transparent 1px);
+  }
+}
+/* The touch floor, in one rule rather than in every size variant. The design
+   system asks for 44px hit targets; the dense sizes are 36px, which is right for a
+   mouse on an admin table full of rows and wrong for a thumb. Rather than making
+   every screen 44px or making none of them, the bump is attached to the input
+   modality that needs it. `data-mw-control` is set by the button and input
+   directives, so nothing has to remember to opt in. */
+@media (pointer: coarse) {
+  [data-mw-control] { min-height: 44px; }
+}
+/* `dark:` follows the operating system and nothing else, which is Tailwind's
+   default and is deliberate here.
+
+   The alternative was tried and measured rather than argued about. Making the
+   variant accept an explicit `[data-theme]` override *as well* — so the workshop
+   could offer a toggle, and a future product toggle would need no re-plumbing —
+   emits every dark utility twice, once under the attribute and once inside the
+   media query: **25,912 -> 33,917 bytes, +8,005, a 31% increase**, at 42 dark
+   utilities and roughly 190 bytes each, growing with every one added after.
+
+   That is a large permanent cost on the shipped sheet for a capability the product
+   does not have, and `stack.md` says plainly that the workshop must not drive the
+   product's CSS. The workshop looks at the dark theme by emulating the media query
+   instead, which is also how the Playwright suite checks it, and costs nothing.
+
+   This number now does a second job. Design system 3.5 used to leave the public-page
+   toggle open; R367 closes it, and the same measurement is what closes it in both
+   directions. A toggle costs 31% of the sheet for something nobody asked for -- and
+   *removing* the dark theme from the public pages costs the same 31%, because a
+   media query cannot know which route it is on and `mw-shell` is shared by the seven
+   public pages, the 404 and all three app layouts. Scoping the theme per route means
+   this mechanism or a forked kit. Keeping it costs nothing. */
+:root { color-scheme: light dark; }
+body { @apply bg-ink-50 text-ink-800 dark:bg-ink-900 dark:text-ink-100; }

@@ -1,0 +1,5 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": { "rootDir": ".", "outDir": "dist-tsc", "types": ["node", "vscode"], "noEmit": true, "module": "NodeNext" },
+  "include": ["src", "test", "tsup.config.ts", "vitest.config.ts"]
+}

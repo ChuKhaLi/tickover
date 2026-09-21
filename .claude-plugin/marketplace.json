@@ -1,0 +1,14 @@
+{
+  "name": "tickover",
+  "owner": { "name": "Tickover", "url": "https://github.com/ChuKhaLi" },
+  "description": "Tickover: earn while Claude thinks, one paid single-choice question in the status line while Claude works.",
+  "plugins": [
+    {
+      "name": "tickover",
+      "source": "./packages/plugin",
+      "displayName": "Tickover",
+      "description": "Earn while Claude thinks: one paid, single-choice question in the status line while Claude works.",
+      "version": "0.1.0"
+    }
+  ]
+}
