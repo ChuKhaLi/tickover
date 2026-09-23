@@ -65,7 +65,15 @@ describe('statusline.mjs', () => {
     const d = await fakeDaemon('tickover · x')
     const home = mkdtempSync(join(tmpdir(), 'mw-sl-'))
     writeFileSync(join(home, 'daemon.json'), JSON.stringify({ port: d.port, token: 'tok', pid: 1, startedAt: '' }))
-    writeFileSync(join(home, 'config.json'), JSON.stringify({ wrappedStatusLine: { type: 'command', command: `node -e "process.stdin.resume();process.stdout.write('orig ' + JSON.parse(require('fs').readFileSync(0,'utf8')).model.display_name)"` } }))
+    // Reads its stdin the way a real status line command does: on 'data'/'end', not with a
+    // synchronous `readFileSync(0)` after `process.stdin.resume()`. That pattern passed on
+    // Windows for months and fails on POSIX, which is what the first CI run on Linux found:
+    // resume() puts fd 0 in non-blocking mode, statusline.mjs writes the payload just after
+    // spawning, and the child's readFileSync therefore hits an empty pipe and throws
+    // `EAGAIN: resource temporarily unavailable`. It wrote nothing to stdout, runWrapped saw
+    // an empty result, and the assertion below read as "the wrapper did not run" when the
+    // wrapper had run fine and the fixture was broken.
+    writeFileSync(join(home, 'config.json'), JSON.stringify({ wrappedStatusLine: { type: 'command', command: `node -e "let s='';process.stdin.on('data',c=>s+=c).on('end',()=>process.stdout.write('orig '+JSON.parse(s).model.display_name))"` } }))
     const r = await run(home)
     expect(r.stdout).toBe('orig Opus\ntickover · x')
     await d.close()

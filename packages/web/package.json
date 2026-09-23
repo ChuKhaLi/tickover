@@ -17,6 +17,7 @@
     "pretypecheck": "pnpm --filter @tickover/contract build",
     "typecheck": "tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.spec.json --noEmit && tsc -p tsconfig.scripts.json --noEmit && tsc -p tsconfig.e2e.json --noEmit",
     "preview": "tsx e2e/static-server.ts",
+    "favicon": "tsx scripts/make-favicon.ts",
     "storybook": "storybook dev -p 6006 --no-open --disable-telemetry",
     "build-storybook": "storybook build --disable-telemetry"
   },

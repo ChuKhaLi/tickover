@@ -10,6 +10,11 @@ describe('submitWaitlist', () => {
     expect(await submitWaitlist(fetchFn, 'https://formspree.io/f/x', { email: 'a@b.co', audience: 'buyer' })).toBe('ok')
     expect(calls[0]!.url).toBe('https://formspree.io/f/x')
     expect(JSON.parse(String(calls[0]!.init.body))).toEqual({ email: 'a@b.co', audience: 'buyer' })
+    // `accept` is load-bearing, not politeness. Basin answers `vary: Accept, Origin`:
+    // with this header it returns JSON, and without it the HTML success page — which
+    // `submitWaitlist` cannot parse and reports as 'failed' while Basin has recorded the
+    // signup, so both sides believe they are right and neither hears about it (R146).
+    expect(calls[0]!.init.headers).toMatchObject({ 'content-type': 'application/json', accept: 'application/json' })
   })
   it('reports failure on network errors, non-2xx, and a missing endpoint', async () => {
     const failing = (async () => { throw new Error('offline') }) as unknown as typeof fetch
@@ -59,6 +64,18 @@ describe('submitWaitlist reads the body, not just the status', () => {
     // 204, and a 200 with nothing in it: there is no body to contradict the status.
     expect(await post('', 204)).toBe('ok')
     expect(await post('   ')).toBe('ok')
+  })
+
+  // Captured from the endpoint this site posts to, on 2026-09-23, rather than written
+  // from the provider's documentation — the docs do not say what a JSON request gets
+  // back. Three things matter in it: the 200 is JSON and not the HTML success page, the
+  // `redirect_url` is offered rather than taken (a real redirect would have landed us on
+  // that HTML), and `given_params` echoes both fields, so `audience` survives the trip.
+  // That echo is the whole of the segmentation; without it the waitlist is one list.
+  it('accepts the body Basin returns, redirect_url and all', async () => {
+    expect(
+      await post('{"success":true,"redirect_url":"https://usebasin.com/f/e7b7a5252989/63929388/success","given_params":{"email":"a@b.co","audience":"developer"}}'),
+    ).toBe('ok')
   })
 
   it('refuses a 200 whose body reports an error', async () => {

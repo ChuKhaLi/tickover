@@ -63,7 +63,19 @@ function stylesheet(): string {
  * names the offending variable. The two split the work — this one says the size moved
  * and to account for it, that one says the size moved for a reason that is not allowed.
  */
-const BASELINE_BYTES = 25_528
+// 25_528 -> 25_575 when the mark went into the header: `.gap-2`, `.h-[22px]` and
+// `.w-[22px]`, the three utilities that markup asks for and nothing else.
+//
+// It was 25_597 for one build in between, and the extra 22 bytes are worth recording.
+// A comment added to `index.html` described the SVG icon as replacing "a fixed pair" of
+// raster sizes, and Tailwind minted `.fixed` out of that ordinary English sentence —
+// R47/R64/R77 happening again, in the shell file, which cannot be excluded because it is
+// the shell. The test below caught it. The prose was reworded, not excluded.
+//
+// Recorded because of how it was nearly missed: the first check for minted prose used
+// `.fixed` as a *control* to prove the search worked, when its presence was the defect
+// the search was meant to find.
+const BASELINE_BYTES = 25_575
 
 /**
  * It was 18,014 before the design token layer, and the token layer made the sheet

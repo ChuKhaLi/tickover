@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Tickover">
+  <title>Tickover</title>
+  <!--
+    A shell prompt with the cursor waiting after it, on the pane's own surface.
+    That is the product's idea rather than a decoration of it: a prompt sitting at a lit
+    caret is what a terminal looks like while it is running and has nothing to do, which is
+    what "tickover" means.
+
+    The design system spends all its boldness on the pane and keeps everything else quiet
+    (§3), so a mark drawn from anything but the pane would be drawn from the quiet half.
+
+    Two tones, not one, and the split carries the meaning: the chevron is furniture and takes
+    `ink-400`, the same step the pane uses for muted text; the caret is the live thing and
+    takes `signal-300`, the pane accent. The surface is `ink-950`, which §3.5 calls the pane
+    surface in both themes, so this tile is the pane rather than a picture of one.
+
+    Drawn against 16px, not against 96. Two earlier attempts died there: a caret alone
+    survived but said nothing, and a redacted word beside the caret turned to mud. The
+    silhouette here is angular then solid, which stays legible when the detail does not.
+    Margins are 16 either side, the inner corners square because terminals are, and only the
+    outer tile is rounded.
+
+    Note for anyone editing this comment: XML forbids a double hyphen inside a comment, and
+    putting one here makes the whole file invalid. A browser then refuses it in silence, which
+    on a favicon looks like no icon rather than like a broken one.
+  -->
+  <rect width="64" height="64" rx="14" fill="#070A0A"/>
+  <path d="M16 21 L27 32 L16 43" fill="none" stroke="#9BA3A1" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="37" y="21" width="11" height="22" fill="#92E6E0"/>
+</svg>

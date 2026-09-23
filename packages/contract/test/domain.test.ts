@@ -173,5 +173,17 @@ describe('the domain every shipped surface names', () => {
     expect(new URL(SITE.API_ORIGIN).hostname.endsWith(`.${SITE.DOMAIN}`)).toBe(true)
     expect(new URL(SITE.ORIGIN).hostname).toBe(SITE.DOMAIN)
     expect(SITE.CONTACT_EMAIL.endsWith(`@${SITE.DOMAIN}`)).toBe(true)
+
+    // And the proxy has to serve that subdomain, which is a separate fact from naming it.
+    // Present only in the private tree. Caddy answers an unmatched Host with 200 and an
+    // empty body, so a missing site block is not an error anybody sees -- it is every fresh
+    // install quietly receiving nothing from a request that succeeded.
+    const caddyfile = read('deploy/Caddyfile.prod')
+    if (caddyfile !== null) {
+      const sub = new URL(SITE.API_ORIGIN).hostname.slice(0, -(SITE.DOMAIN.length + 1))
+      expect(caddyfile, 'deploy/Caddyfile.prod has no site block for the API hostname').toContain(
+        `${sub}.{$SITE_HOST}`,
+      )
+    }
   })
 })

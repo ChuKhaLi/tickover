@@ -4,6 +4,9 @@ node_modules/
 dist/
 coverage/
 .env
+# deploy/build.env holds the VITE_* values baked into the web image. Not secrets, but
+# per-environment, and a staging value committed here would ship to production.
+build.env
 *.log
 test-results/
 playwright-report/

@@ -8,7 +8,12 @@ import { RouterLink } from '@angular/router'
     <div class="min-h-screen flex flex-col">
       <header class="border-b border-ink-200 dark:border-ink-700">
         <nav class="mx-auto max-w-content flex items-center gap-6 px-4 py-3">
-          <a routerLink="/" class="font-semibold">tickover</a>
+          <!-- The mark is decorative here, so alt is empty: the wordmark beside it already
+               says the name, and a screen reader that read both would say it twice. Width and
+               height are attributes as well as classes so the row does not reflow between the
+               HTML arriving and the stylesheet applying. -->
+          <a routerLink="/" class="flex items-center gap-2 font-semibold">
+            <img src="/logo.svg" alt="" width="22" height="22" class="h-[22px] w-[22px]" />tickover</a>
           @for (l of links(); track l.href) { <a [routerLink]="l.href" class="text-small text-ink-600 hover:underline dark:text-ink-400">{{ l.label }}</a> }
           <span class="ml-auto text-small text-ink-600 dark:text-ink-400"><ng-content select="[slot=right]" /></span>
         </nav>
