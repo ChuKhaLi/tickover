@@ -1,12 +1,13 @@
 import { Component } from '@angular/core'
-import { PRICING, RULES, quoteStudy } from '@tickover/contract'
+import { PRICING, RULES, SITE, quoteStudy } from '@tickover/contract'
 import { Money } from '../ui/money'
+import { Link } from '../ui/button'
 import { Shell } from '../ui/shell'
 import { WaitlistForm } from '../ui/waitlist-form'
 import { DERIVED_LIST, NEVER_LIST, SENT_LIST } from '../lib/disclosure'
 
 @Component({
-  imports: [Shell, WaitlistForm, Money],
+  imports: [Shell, WaitlistForm, Money, Link],
   template: `
     <mw-shell [links]="[{ href: '/buyers', label: 'For buyers' }, { href: '/data', label: 'Data' }]">
       <h1 class="max-w-[24ch] text-h1-public text-ink-900 dark:text-ink-50">Get paid to answer one question while Claude works</h1>
@@ -20,9 +21,9 @@ import { DERIVED_LIST, NEVER_LIST, SENT_LIST } from '../lib/disclosure'
 
            The comparison figure is left as it is written: an advertising CPM is not a
            Tickover price and has nothing in the contract to come from. -->
-      <p class="mt-3 max-w-[68ch] text-lead text-ink-600 dark:text-ink-400"><mw-money [cents]="developerCents" /> a question, not $0.002 an ad. The plugin is open source.</p>
+      <p class="mt-3 max-w-[68ch] text-lead text-ink-600 dark:text-ink-400"><mw-money [cents]="developerCents" /> a question, not $0.002 an ad. The plugin is <a mw-link [href]="sourceRepo">open source</a>.</p>
       <ol class="mt-6 max-w-[68ch] list-decimal space-y-2 pl-6">
-        <li>Install the Tickover plugin from the Claude Code marketplace and run <code>/tickover:setup</code>.</li>
+        <li>Install the Tickover plugin from the Claude Code marketplace and run <code>/tickover:setup</code>. It installs the local daemon, <a mw-link [href]="npmPackage">tickover-cli</a>, from npm.</li>
         <li>When Claude has been working for a few seconds, one question appears in your status line with the sponsor and the amount.</li>
         <li>Answer with one key in a terminal pane, on a local page, or in the VS Code status bar. Skips cost nothing.</li>
       </ol>
@@ -49,7 +50,7 @@ import { DERIVED_LIST, NEVER_LIST, SENT_LIST } from '../lib/disclosure'
       <!-- §5.5's third list. Leaving it out let /buyers sell targeting on a country
            this page never admitted to deriving. -->
       <p class="mt-2 max-w-[68ch]">Derived on our side, not sent by the plugin: {{ derivedList }}. Buyers can target on both.</p>
-      <p class="mt-2 max-w-[68ch] font-medium">Never: {{ neverList }}. The plugin is open source and has no self-updater.</p>
+      <p class="mt-2 max-w-[68ch] font-medium">Never: {{ neverList }}. The plugin is <a mw-link [href]="sourceRepo">open source</a> and has no self-updater.</p>
       <h2 class="mt-10 text-h2 text-ink-900 dark:text-ink-50">Join the waitlist</h2>
       <mw-waitlist-form class="mt-3 block" audience="developer" />
     </mw-shell>`,
@@ -57,6 +58,8 @@ import { DERIVED_LIST, NEVER_LIST, SENT_LIST } from '../lib/disclosure'
 export default class DevelopersPage {
   private quote = quoteStudy({ targeted: false, atCost: false })
   developerCents = this.quote.developerCents
+  sourceRepo = SITE.SOURCE_REPO
+  npmPackage = SITE.NPM_PACKAGE_URL
   buyerPriceCents = this.quote.priceCents
   developerShare = PRICING.DEVELOPER_SHARE * 100
   maxPaidPerDay = RULES.MAX_PAID_PER_DAY

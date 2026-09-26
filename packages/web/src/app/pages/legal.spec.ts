@@ -2,7 +2,7 @@ import type { Type } from '@angular/core'
 import { TestBed } from '@angular/core/testing'
 import { provideRouter } from '@angular/router'
 import { describe, it, expect } from 'vitest'
-import { PRICING, RULES, quoteStudy } from '@tickover/contract'
+import { CREDIT_PACK_CENTS, PRICING, RULES, SITE, quoteStudy } from '@tickover/contract'
 import PrivacyPage from './privacy.page'
 import DevelopersPage from './developers.page'
 import DeveloperTermsPage from './terms/developers.page'
@@ -307,6 +307,59 @@ describe('the buyer terms', () => {
     expect(text).toContain('merchant of record')
     expect(text, 'a rejected study looks like a lost payment').toContain('credit is returned')
   })
+
+  // R417. Paddle's domain review asks for a refund policy reachable from the navigation, and the
+  // old Payment paragraph said credit was "not exchangeable for cash" -- which the policy below
+  // now contradicts, so the sentence has to go rather than sit beside it.
+  it('states the refund policy in its own section, anchored for the footer link', () => {
+    TestBed.resetTestingModule()
+    TestBed.configureTestingModule({ providers: [provideRouter([])] })
+    const fixture = TestBed.createComponent(BuyerTermsPage)
+    fixture.detectChanges()
+    const el = fixture.nativeElement as HTMLElement
+    const heading = el.querySelector('h2#refunds')
+    expect(heading, 'no h2#refunds for the footer to point at').not.toBeNull()
+    const text = textOf(BuyerTermsPage)
+    expect(text).toContain('Unused credit is refunded to your original payment method on request within 14 days of purchase.')
+    expect(text).toContain('Credit spent on a study that has started collecting responses is not refundable')
+    expect(text).not.toContain('not exchangeable for cash')
+  })
+
+  // R417: Paddle compares the site's pricing with its catalogue, which sells credit in packs. The
+  // pack sizes come from the contract, like every other figure on these pages (R58).
+  it('names the credit packs from the contract', () => {
+    const text = textOf(BuyerTermsPage)
+    for (const cents of CREDIT_PACK_CENTS) expect(text, formatCents(cents)).toContain(formatCents(cents))
+  })
+})
+
+// R417. Paddle's domain review wants the seller named in the terms: "the company name or sole
+// proprietor's brand". A brand is enough, so the pages name Tickover as a trading name and not the
+// person behind it; the phrase they replace is pinned out so it cannot come back on one page.
+// R418. "So is this page's history" is a promise, and the public repository publishes this file at
+// the same path, so the link goes to its commit history there -- the promise made checkable.
+describe('the privacy page history', () => {
+  it("links \"this page's history\" to the page file's commits in the public repository", () => {
+    TestBed.resetTestingModule()
+    TestBed.configureTestingModule({ providers: [provideRouter([])] })
+    const fixture = TestBed.createComponent(PrivacyPage)
+    fixture.detectChanges()
+    const href = `${SITE.SOURCE_REPO}/commits/main/packages/web/src/app/pages/privacy.page.ts`
+    const link = (fixture.nativeElement as HTMLElement).querySelector(`main a[href="${href}"]`)
+    expect(link?.textContent?.trim()).toBe("this page's history")
+  })
+})
+
+describe('who the seller is', () => {
+  it.each([
+    ['privacy', PrivacyPage],
+    ['developer terms', DeveloperTermsPage],
+    ['buyer terms', BuyerTermsPage],
+  ] as Array<[string, Type<unknown>]>)('names a trading name, not a person, on the %s page', (_label, page) => {
+    const text = textOf(page)
+    expect(text).toContain('Tickover is a trading name of an independent sole proprietor based in Vietnam.')
+    expect(text).not.toContain('independent developer')
+  })
 })
 
 describe('the three legal pages', () => {
@@ -338,5 +391,10 @@ describe('the three legal pages', () => {
     for (const route of ['/privacy', '/terms/developers', '/terms/buyers']) {
       expect(hrefs, `the footer does not link ${route}`).toContain(route)
     }
+    // R417: the refund policy has to be reachable from the navigation. A path with the fragment
+    // typed into routerLink would be encoded to %23 and land nowhere, so this is the real href.
+    expect(hrefs, 'the footer does not link the refund policy').toContain('/terms/buyers#refunds')
+    // R418: the source, as a plain link: it leaves the site, so it is not a route.
+    expect(hrefs, 'the footer does not link the public repository').toContain(SITE.SOURCE_REPO)
   })
 })

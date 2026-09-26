@@ -132,6 +132,15 @@ describe('the domain every shipped surface names', () => {
     expect(daemon.homepage, 'packages/daemon/package.json homepage').toBe(SITE.ORIGIN)
     expect(vscode.homepage, 'packages/vscode/package.json homepage').toBe(SITE.ORIGIN)
 
+    // R418: the public repository, which the site now links, is one address in every manifest.
+    const plugin = JSON.parse(read('packages/plugin/.claude-plugin/plugin.json')!)
+    expect(plugin.repository, 'plugin.json repository').toBe(SITE.SOURCE_REPO)
+    for (const [name, pkg] of [['daemon', daemon], ['vscode', vscode]] as const) {
+      expect(pkg.repository.url, `packages/${name}/package.json repository`).toBe(`git+${SITE.SOURCE_REPO}.git`)
+    }
+    // The npm page the site links is the package the daemon manifest publishes.
+    expect(SITE.NPM_PACKAGE_URL, 'NPM_PACKAGE_URL names the published daemon').toBe(`https://www.npmjs.com/package/${daemon.name}`)
+
     // og:url on the SPA shell, which is what a crawler reads on a route the prerender missed.
     expect(read('packages/web/index.html'), 'packages/web/index.html og:url').toContain(`content="${SITE.ORIGIN}/"`)
 

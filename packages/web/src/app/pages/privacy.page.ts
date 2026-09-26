@@ -1,6 +1,7 @@
 import { Component } from '@angular/core'
-import { RULES } from '@tickover/contract'
+import { RULES, SITE } from '@tickover/contract'
 import { Shell } from '../ui/shell'
+import { Link } from '../ui/button'
 import { DERIVED_LIST, NEVER_LIST, SENT_LIST } from '../lib/disclosure'
 
 /**
@@ -23,14 +24,14 @@ import { DERIVED_LIST, NEVER_LIST, SENT_LIST } from '../lib/disclosure'
  * fail.
  */
 @Component({
-  imports: [Shell],
+  imports: [Shell, Link],
   template: `
     <mw-shell [links]="[{ href: '/developers', label: 'For developers' }, { href: '/buyers', label: 'For buyers' }]">
       <h1 class="text-h1-public text-ink-900 dark:text-ink-50">Privacy</h1>
-      <p class="mt-3 max-w-[68ch] text-ink-600 dark:text-ink-400">The same three lists the plugin shows you before it sends anything, plus what happens to them afterwards. Last updated 7 September 2026.</p>
+      <p class="mt-3 max-w-[68ch] text-ink-600 dark:text-ink-400">The same three lists the plugin shows you before it sends anything, plus what happens to them afterwards. Last updated 26 September 2026.</p>
 
       <h2 class="mt-10 text-h2 text-ink-900 dark:text-ink-50">Who runs this</h2>
-      <p class="mt-2 max-w-[68ch]">Tickover is operated by one independent developer based in Vietnam. There is no company behind it yet. Questions, corrections and requests all go to the same place: hello&#64;tickover.dev, answered by a person.</p>
+      <p class="mt-2 max-w-[68ch]">Tickover is a trading name of an independent sole proprietor based in Vietnam. There is no company behind it yet. Questions, corrections and requests all go to the same place: hello&#64;tickover.dev, answered by a person.</p>
 
       <h2 class="mt-10 text-h2 text-ink-900 dark:text-ink-50">What the plugin sends</h2>
       <!-- Rendered from the contract's DISCLOSURE, the one source the consent
@@ -77,10 +78,12 @@ import { DERIVED_LIST, NEVER_LIST, SENT_LIST } from '../lib/disclosure'
       </ul>
 
       <h2 class="mt-10 text-h2 text-ink-900 dark:text-ink-50">If this page changes</h2>
-      <p class="mt-2 max-w-[68ch]">The plugin is open source and so is this page's history. A change that narrows what we collect needs no warning; a change that widens it will be shown in the consent screen again before it takes effect.</p>
+      <p class="mt-2 max-w-[68ch]">The plugin is open source and so is <a mw-link [href]="historyUrl">this page's history</a>. A change that narrows what we collect needs no warning; a change that widens it will be shown in the consent screen again before it takes effect.</p>
     </mw-shell>`,
 })
 export default class PrivacyPage {
+  /** R418: the public repository publishes this file at the same path, so its history is checkable. */
+  historyUrl = `${SITE.SOURCE_REPO}/commits/main/packages/web/src/app/pages/privacy.page.ts`
   sentList = SENT_LIST
   derivedList = DERIVED_LIST
   neverList = NEVER_LIST

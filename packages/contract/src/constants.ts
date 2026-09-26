@@ -33,6 +33,15 @@ export const PRICING = {
   MAX_RESPONDENTS: 500,
 } as const
 
+/**
+ * The credit packs Paddle sells, in integer cents: the minimum study (50 responses at $1), the
+ * `/buyers` pitch of 300 developers, and the largest targeted study (500 at $1.50). The public
+ * pages name them because Paddle's domain review compares a site's pricing with its catalogue
+ * (R417). The server's `PADDLE_PRICE_MAP` is what actually credits a payment, and it has to hold
+ * one price for each of these; `docs/setup-paddle.md` says so where the map is written.
+ */
+export const CREDIT_PACK_CENTS = [5000, 30000, 75000] as const
+
 export interface StudyQuote {
   priceCents: number
   developerCents: number
@@ -67,4 +76,11 @@ export const SITE = {
   API_ORIGIN: 'https://api.tickover.dev',
   /** The privacy contact on /privacy, and the appeal route on /terms/developers. */
   CONTACT_EMAIL: 'hello@tickover.dev',
+  /**
+   * The public mirror of the client and web source (R119), linked from the site so that "the
+   * plugin is open source" can be checked (R418). Every manifest's repository field names it.
+   */
+  SOURCE_REPO: 'https://github.com/ChuKhaLi/tickover',
+  /** The daemon on npm, which `/tickover:setup` installs; `/developers` links it (R418). */
+  NPM_PACKAGE_URL: 'https://www.npmjs.com/package/tickover-cli',
 } as const

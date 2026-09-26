@@ -31,7 +31,7 @@ const targeted = quoteStudy({ targeted: true, atCost: false })
   template: `
     <mw-shell [links]="[{ href: '/developers', label: 'For developers' }, { href: '/privacy', label: 'Privacy' }]">
       <h1 class="text-h1-public text-ink-900 dark:text-ink-50">Developer terms</h1>
-      <p class="mt-3 max-w-[68ch] text-ink-600 dark:text-ink-400">Plain terms for answering paid questions. Last updated 7 September 2026.</p>
+      <p class="mt-3 max-w-[68ch] text-ink-600 dark:text-ink-400">Plain terms for answering paid questions. Last updated 26 September 2026.</p>
 
       <h2 class="mt-10 text-h2 text-ink-900 dark:text-ink-50">What this is</h2>
       <p class="mt-2 max-w-[68ch]">You answer single-choice questions in the idle window of your AI coding tool, and you are paid per answer. You take part as an independent contractor. You are not an employee, not a worker, and not an agent of Tickover, and nothing here creates a partnership or a joint venture.</p>
@@ -70,7 +70,7 @@ const targeted = quoteStudy({ targeted: true, atCost: false })
       <p class="mt-2 max-w-[68ch]">We can end an account for the reasons above. If we do it in error, write to hello&#64;tickover.dev and a person will read it.</p>
 
       <h2 class="mt-10 text-h2 text-ink-900 dark:text-ink-50">The boring part</h2>
-      <p class="mt-2 max-w-[68ch]">Tickover is run by one independent developer based in Vietnam, and Vietnamese law governs these terms. The service is provided as it is, with no promise that a question will ever be available to you, and liability is limited to money you have earned and not yet been paid. If one clause turns out to be unenforceable, the rest still stand.</p>
+      <p class="mt-2 max-w-[68ch]">Tickover is a trading name of an independent sole proprietor based in Vietnam. Vietnamese law governs these terms. The service is provided as it is, with no promise that a question will ever be available to you, and liability is limited to money you have earned and not yet been paid. If one clause turns out to be unenforceable, the rest still stand.</p>
     </mw-shell>`,
 })
 export default class DeveloperTermsPage {

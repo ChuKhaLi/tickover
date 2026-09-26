@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing'
 import { DOCUMENT } from '@angular/common'
 import { Seo } from './seo'
 import { PAGE_META, SITE_URL } from './page-meta'
+import { SITE } from '@tickover/contract'
 
 const head = () => TestBed.inject(DOCUMENT).head
 const attr = (sel: string, a = 'content') => head().querySelector(sel)?.getAttribute(a) ?? null
@@ -36,6 +37,15 @@ describe('Seo.apply', () => {
     const data = JSON.parse(s[0]!.textContent!)
     expect(data['@graph'].map((n: { '@type': string }) => n['@type'])).toEqual(['Organization', 'WebSite'])
     expect(s[0]!.textContent).not.toMatch(/aggregateRating|review|FAQPage|SoftwareApplication/i)
+  })
+
+  // R418: the public repository is the Organization's other identity, so search engines can tie
+  // the site to the code it says is open.
+  it('names the public repository as the Organization sameAs', () => {
+    seo.apply('/')
+    const data = JSON.parse(head().querySelector('script[type="application/ld+json"]')!.textContent!)
+    const org = data['@graph'].find((n: { '@type': string }) => n['@type'] === 'Organization')
+    expect(org.sameAs).toEqual([SITE.SOURCE_REPO])
   })
 
   it('marks a route off the map noindex and drops the canonical', () => {

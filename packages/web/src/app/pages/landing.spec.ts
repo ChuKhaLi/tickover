@@ -8,7 +8,7 @@ import { TestBed, type ComponentFixture } from '@angular/core/testing'
 import { Router, provideRouter } from '@angular/router'
 import { RouterTestingHarness } from '@angular/router/testing'
 import { describe, it, expect } from 'vitest'
-import { ActivityTier, PRICING, RULES, quoteStudy } from '@tickover/contract'
+import { ActivityTier, CREDIT_PACK_CENTS, PRICING, RULES, SITE, quoteStudy } from '@tickover/contract'
 import { App } from '../app'
 import { appConfig } from '../app.config'
 import IndexPage from './index.page'
@@ -244,6 +244,14 @@ describe('public pages', () => {
     expect(text).toContain('Every study is approved by a person before it goes live')
   })
 
+  // R417: Paddle's catalogue sells credit in three packs, and its domain review compares the site's
+  // pricing with the catalogue. So the page a buyer decides from names the packs, from the contract.
+  it('names the credit packs Paddle sells, from the contract', () => {
+    const text = textOf(BuyersPage)
+    const packs = CREDIT_PACK_CENTS.map(formatCents)
+    expect(text).toContain(`Credit, bought ahead through Paddle${packs.slice(0, -1).join(', ')} or ${packs.at(-1)}`)
+  })
+
   it('posts a developer signup as a developer, all the way to the wire', async () => {
     const { calls, el } = await submitFrom(DevelopersPage, 'dev@example.com')
     expect(calls).toHaveLength(1)
@@ -433,6 +441,27 @@ describe('public pages', () => {
  * change, "buyers.page.ts line 34 changed" is not.
  */
 describe('the spec claims these pages make', () => {
+  // R418: "the plugin is open source" was said twice on this page with nothing to click. The trust
+  // pitch is that the claims can be checked, so both say it with a link to the code.
+  it('links both open-source claims on /developers to the public repository', () => {
+    TestBed.resetTestingModule()
+    TestBed.configureTestingModule({ providers: [provideRouter([])] })
+    const fixture = TestBed.createComponent(DevelopersPage)
+    fixture.detectChanges()
+    const links = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll(`main a[href="${SITE.SOURCE_REPO}"]`))
+    expect(links.map((a) => a.textContent?.trim())).toEqual(['open source', 'open source'])
+  })
+
+  // R418: the install step names what lands on the developer's machine, and links it.
+  it('names and links the npm package the setup installs', () => {
+    TestBed.resetTestingModule()
+    TestBed.configureTestingModule({ providers: [provideRouter([])] })
+    const fixture = TestBed.createComponent(DevelopersPage)
+    fixture.detectChanges()
+    const link = (fixture.nativeElement as HTMLElement).querySelector(`main a[href="${SITE.NPM_PACKAGE_URL}"]`)
+    expect(link?.textContent?.trim()).toBe('tickover-cli')
+  })
+
   // Spec §4.7's rejection grounds, and the same list the buyer terms carry. A study
   // that would be refused is cheaper to not write than to have rejected.
   it('states the review policy in full, on the page a buyer decides from', () => {

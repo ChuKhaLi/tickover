@@ -1,5 +1,6 @@
 import { Component, input } from '@angular/core'
 import { RouterLink } from '@angular/router'
+import { SITE } from '@tickover/contract'
 
 @Component({
   selector: 'mw-shell',
@@ -43,17 +44,26 @@ import { RouterLink } from '@angular/router'
              the product's only distinctive typographic device. -->
         <p class="mx-auto max-w-[68ch]">The sponsor is shown with every paid question. Tickover never reads your prompts or files.</p>
         <p class="mt-1 flex justify-center gap-4">
-          @for (l of legal; track l.href) { <a [routerLink]="l.href" class="hover:underline">{{ l.label }}</a> }
+          @for (l of legal; track l.label) { <a [routerLink]="l.href" [fragment]="l.fragment" class="hover:underline">{{ l.label }}</a> }
+          <a [href]="sourceRepo" class="hover:underline">Source</a>
         </p>
       </footer>
     </div>`,
 })
 export class Shell {
   links = input<Array<{ href: string; label: string }>>([])
-  /** Fixed, not an input: these three are on every page or they are on none. */
-  legal = [
+  /**
+   * Fixed, not an input: these are on every page or they are on none. Refunds is a section of the
+   * buyer terms, linked by fragment because Paddle's domain review wants the refund policy
+   * reachable from the navigation (R417). The fragment is its own input: typed into the path,
+   * routerLink encodes the hash and the link lands nowhere.
+   */
+  /** R418: the public repository, so the open-source claims on these pages can be checked. */
+  sourceRepo = SITE.SOURCE_REPO
+  legal: Array<{ href: string; label: string; fragment?: string }> = [
     { href: '/privacy', label: 'Privacy' },
     { href: '/terms/developers', label: 'Developer terms' },
     { href: '/terms/buyers', label: 'Buyer terms' },
+    { href: '/terms/buyers', label: 'Refunds', fragment: 'refunds' },
   ]
 }

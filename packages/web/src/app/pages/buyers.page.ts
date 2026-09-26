@@ -1,6 +1,6 @@
 import { Component } from '@angular/core'
 import { RouterLink } from '@angular/router'
-import { PRICING, quoteStudy } from '@tickover/contract'
+import { CREDIT_PACK_CENTS, PRICING, quoteStudy } from '@tickover/contract'
 import { Link } from '../ui/button'
 import { Money } from '../ui/money'
 import { Figure, Rows } from '../ui/rows'
@@ -26,6 +26,9 @@ import { WaitlistForm } from '../ui/waitlist-form'
           <tr><td>Per valid response</td><td mw-figure><mw-money voice="data" [cents]="full.priceCents" /></td></tr>
           <tr><td>With targeting (language, country, activity, OS)</td><td mw-figure>+<mw-money voice="data" [cents]="targetingCents" /></td></tr>
           <tr><td>Study size</td><td mw-figure>{{ minRespondents }} to {{ maxRespondents }} respondents</td></tr>
+          <!-- R417: the packs Paddle's catalogue sells, which its domain review compares with these
+               rows. From the contract, like every other figure here (R58). -->
+          <tr><td>Credit, bought ahead through Paddle</td><td mw-figure>@for (cents of packs; track cents; let last = $last, i = $index) {<mw-money voice="data" [cents]="cents" />@if (i === packs.length - 2) { or }@else if (!last) {, }}</td></tr>
           <!-- Both branches, because the row above sells targeting and nothing stops
                a first study from using it: quoteStudy charges the developer share
                plus the payment fee, so at cost is 55c untargeted and 80c targeted
@@ -68,4 +71,5 @@ export default class BuyersPage {
   atCostFeeCents = PRICING.AT_COST_FEE_CENTS
   minRespondents = PRICING.MIN_RESPONDENTS
   maxRespondents = PRICING.MAX_RESPONDENTS
+  packs = CREDIT_PACK_CENTS
 }
