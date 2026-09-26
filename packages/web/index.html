@@ -2,7 +2,6 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <!-- Landing defaults; each route's own head is written at build time. -->
     <title>Tickover — Earn while Claude thinks</title>
     <base href="/" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -17,24 +16,10 @@
     />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://tickover.dev/" />
-    <meta name="twitter:card" content="summary" />
-    <!-- Without this every page load asks for /favicon.ico and gets the SPA shell
-         with an HTML content type, which the browser logs as a failed icon. The
-         file is `public/favicon.ico`, copied verbatim into the build output.
-         It holds three rasters of the mark, drawn by `scripts/make-favicon.ts`,
-         and this list has to name every one of them: a browser chooses an entry
-         from the attribute without opening the file, so an attribute that lies
-         costs a request and yields nothing. `test/unit/icon.spec.ts` keeps the
-         two in agreement. -->
+    <meta property="og:image" content="https://tickover.dev/og.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="theme-color" content="#070A0A" />
     <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48" />
-    <!-- The mark, for browsers that take SVG: one file that scales, rather than the
-         pair of raster sizes above it, and the same file the header renders. Declared
-         after the .ico on purpose — a browser that understands `type="image/svg+xml"`
-         prefers it, and one that does not never sees it and keeps the .ico.
-         Every word in this comment is scanned by Tailwind. An earlier draft of it used
-         an ordinary English word that is also a utility name, and minted that utility
-         into the stylesheet; `styles.spec.ts` caught it. Reword prose here rather than
-         excluding the file — the file has to be scanned, it is the shell. -->
     <link rel="icon" href="/logo.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/src/styles.css" />
   </head>

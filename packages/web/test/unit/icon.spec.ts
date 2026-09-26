@@ -133,6 +133,16 @@ describe('the mark as an icon', () => {
     expect(largest.rgba[3], 'the top-left corner is opaque, so the tile is not rounded').toBe(0)
   })
 
+  // Every byte of the shell is downloaded on every page load, and it is small enough that prose
+  // dominates it: three comments once made up 1,369 of its 2,555 bytes, and one of them named this
+  // very file -- readable in the page source of the live site. The reasoning they carried is in
+  // `README.md` under "index.html carries no comments, deliberately", which ships nowhere.
+  // Counted on the source rather than the build, because that is where a comment gets written.
+  it('ships no commentary to every visitor', () => {
+    const comments = read('index.html').match(/<!--[^]*?-->/g) ?? []
+    expect(comments, `index.html carries ${comments.length} HTML comment(s); put the reasoning in README.md`).toEqual([])
+  })
+
   it('offers the SVG after the .ico, so a browser that takes it sees it last', () => {
     const svgLink = icons.findIndex((l) => l.getAttribute('type') === 'image/svg+xml')
     const icoLink = icons.findIndex((l) => (l.getAttribute('href') ?? '').endsWith('.ico'))

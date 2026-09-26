@@ -9,7 +9,8 @@
  * was invisible to those.
  */
 import { expect, test } from '@playwright/test'
-import { PRICING, quoteStudy } from '@tickover/contract'
+import { PRICING, formatStatusLine, quoteStudy, resolveColumns } from '@tickover/contract'
+import { HERO_STUDY } from '../src/app/lib/hero-study'
 import { formatCents } from '../src/app/lib/money'
 import { PAGE_META, SITE_URL } from '../src/app/lib/page-meta'
 import { AGGREGATE_QUESTION, mockApi } from './mock-api'
@@ -71,6 +72,92 @@ test('a waitlist the endpoint refuses says so instead of claiming to have sent i
 
   await expect(page.getByText("Couldn't send.")).toBeVisible()
   await expect(page.getByText("You're on the list.")).toHaveCount(0)
+})
+
+// R411. The form is in the prerendered bytes (R400), so it takes typing before any script has run.
+// Hydration keeps the element, but the forms module then writes its empty model into it, and event
+// replay re-runs the queued input events only afterwards -- against an element that is already
+// empty. Captured before the fix: value "" after hydration, the control ng-dirty, no POST, and
+// "That email doesn't look right." for an address the visitor typed. The race is made certain rather
+// than hoped for: every script is held until the typing is done. The `jsaction` attribute is what
+// the replay removes once it has run, so its absence is the "hydration is finished" signal; it goes
+// in both the broken and the fixed build, so it cannot make this pass by itself.
+test('an email typed before the page hydrates is the one the waitlist sends', async ({ page }) => {
+  const api = await mockApi(page)
+  let release!: () => void
+  const held = new Promise<void>((r) => { release = r })
+  await page.route('**/assets/*.js', async (route) => { await held; await route.continue() })
+
+  // 'commit', not the default: a module script defers DOMContentLoaded, which never comes while held.
+  await page.goto('/developers', { waitUntil: 'commit' })
+  const field = page.getByPlaceholder('you@company.com')
+  await field.pressSequentially('dev@example.test')
+  // Guards the premise: had anything hydrated already, this would be the ordinary path.
+  await expect(field).toHaveAttribute('jsaction', /input/)
+
+  release()
+  await expect(field).not.toHaveAttribute('jsaction')
+  await expect(field).toHaveValue('dev@example.test')
+
+  await page.getByRole('button', { name: 'Join the waitlist' }).click()
+  await expect(page.getByText("You're on the list.")).toBeVisible()
+  expect(api.waitlistPosts).toEqual([{ email: 'dev@example.test', audience: 'developer' }])
+})
+
+// R413. The same held-script race, but the visitor submits before the page hydrates. Captured before
+// the fix: the browser's own submission ran -- a GET to /developers?email=dev%40example.test -- so the
+// address went into the URL, the history, the server's log and the next Referer, and no POST reached
+// the waitlist. Enter and a click both, because they are two different ways into the same default.
+test('a waitlist submitted before the page hydrates posts once and never puts the email in a URL', async ({ page }) => {
+  const api = await mockApi(page)
+  const urls: string[] = []
+  page.on('request', (r) => urls.push(r.url()))
+  // A replayed event throws if anything calls preventDefault on it; the forms module does, unless
+  // the form's method is "dialog".
+  const errors: string[] = []
+  page.on('pageerror', (e) => errors.push(e.message))
+  let release!: () => void
+  const held = new Promise<void>((r) => { release = r })
+  await page.route('**/assets/*.js', async (route) => { await held; await route.continue() })
+
+  await page.goto('/developers', { waitUntil: 'commit' })
+  const field = page.getByPlaceholder('you@company.com')
+  await field.pressSequentially('dev@example.test')
+  // The premise: the form's submit is still only queued, not handled.
+  await expect(page.locator('form')).toHaveAttribute('jsaction', /submit/)
+  await field.press('Enter')
+  await page.getByRole('button', { name: 'Join the waitlist' }).click()
+
+  release()
+  await expect(page.getByText("You're on the list.").or(field)).toBeVisible()
+  // The URL first: a native submission leaves the page, so the success check below would fail
+  // anyway, and only this line says why. A request list rather than the address bar alone, because a
+  // GET that redirected or was replaced would leave the bar clean and the log dirty.
+  expect(urls.filter((u) => u.includes('email') || u.includes('example.test'))).toEqual([])
+  expect(page.url()).not.toContain('email')
+  await expect(page.getByText("You're on the list.")).toBeVisible()
+  expect(api.waitlistPosts).toEqual([{ email: 'dev@example.test', audience: 'developer' }])
+  expect(errors).toEqual([])
+})
+
+// R413. The hero's width control takes a drag before hydration just as the form takes typing, and
+// lost it the same way: the first render writes cols() -- 80 -- into the element the visitor had
+// moved, and the replayed input event then reads 80 back. Captured before the fix: 80, "80 columns".
+test('the hero width dragged before the page hydrates keeps the width it was dragged to', async ({ page }) => {
+  await mockApi(page)
+  let release!: () => void
+  const held = new Promise<void>((r) => { release = r })
+  await page.route('**/assets/*.js', async (route) => { await held; await route.continue() })
+
+  await page.goto('/', { waitUntil: 'commit' })
+  const slider = page.locator('[data-cols]')
+  await slider.fill('100')
+  await expect(slider).toHaveAttribute('jsaction', /input/)
+
+  release()
+  await expect(slider).not.toHaveAttribute('jsaction')
+  await expect(slider).toHaveValue('100')
+  await expect(page.getByText('100 columns')).toBeVisible()
 })
 
 test('a buyer lands, takes the buyer card, and reads the price table', async ({ page }) => {
@@ -192,6 +279,8 @@ test('the hero replica is a real composed line, and the width ladder is real', a
   // The row, not the whole replica: since R318 the surface also holds the session
   // above the line, and every claim below is about what the composer returned.
   const pane = page.locator('mw-pane [data-line]')
+  // What the developer is paid for this study, which is what the line prints.
+  const payoutCents = quoteStudy({ targeted: false, atCost: false }).developerCents
 
   // Spec 4.7: the disclosure is unconditional, so it survives every rung.
   await expect(pane).toContainText('tickover')
@@ -208,36 +297,74 @@ test('the hero replica is a real composed line, and the width ladder is real', a
   await slider.fill(String(maxCols))
   await expect(page.getByText(`${maxCols} columns`)).toBeVisible()
   const widest = (await pane.innerText()).trim()
-  expect(widest, 'a drag hands the sequence to the visitor and shows the question').toContain('Raycast')
-  expect(widest).toContain('$0.50')
+  // The study's own values, not copies of them: the sponsor and the payout are what the page holds
+  // and what the contract prices, so a change to either moves this test with it rather than past it.
+  expect(widest, 'a drag hands the sequence to the visitor and shows the question').toContain(HERO_STUDY.sponsor)
+  expect(widest).toContain(formatCents(payoutCents))
 
   await slider.fill('80')
   const narrow = (await pane.innerText()).trim()
   expect(narrow).not.toBe(widest)
   expect(narrow.length).toBeLessThan(widest.length)
-  expect(narrow, 'the sponsor and payout survive every rung — spec 4.7').toContain('Raycast')
+  expect(narrow, 'the sponsor and payout survive every rung — spec 4.7').toContain(HERO_STUDY.sponsor)
 
   /**
    * The floor, and the most honest thing this control shows: below the width where a
    * question fits, the composer drops the *question* rather than the disclosure, so
-   * the line falls back to idle. 72 is where that happens for this study.
+   * the line falls back to idle.
    *
-   * It said 66, and the assertion passed, and it was measuring the wrong thing. The
-   * pane was composing at the raw slider value while the client composes at that
-   * value minus `STATUS_LINE_SAFETY_MARGIN`, so this test was honest about the pane
-   * and pointed at a pipe that does not carry the product claim (R358). 71 is the
-   * widest terminal this study's question does not reach, and 72 is the narrowest it
-   * does — both asserted, because a floor claim with only one side of it is a claim
-   * that something is suppressed *somewhere*.
+   * **Derived, not typed.** This assertion has carried a stale literal twice. It said
+   * 66, which was measured against the raw slider value while the client composes at
+   * that value minus `STATUS_LINE_SAFETY_MARGIN` (R358). It then said 71/72, which was
+   * right until the product was renamed: every composed line is prefixed with the
+   * product name, `tickover` is one character shorter than `meanwhile`, and one
+   * character of prefix is one column of floor -- so the rename moved it to 70/71 and
+   * updated the string this test greps for without updating the width (R383). Nothing
+   * caught it, because Playwright is in no CI job.
+   *
+   * So the floor is asked of the composer, for the study the page actually holds, and
+   * what is asserted in the browser is that the replica agrees with it. That is also
+   * the claim worth making: R358 was not a wrong number, it was `mw-pane` resolving
+   * width differently from the daemon, and this goes red the moment it does so again.
    */
-  await slider.fill('71')
+  const showsQuestion = (cols: number) =>
+    formatStatusLine({
+      loggedIn: true,
+      answered: null,
+      todayPaid: 0,
+      pendingCents: 0,
+      availableCents: 0,
+      maxColumns: resolveColumns({ detected: cols }),
+      question: {
+        assignment_id: '00000000-0000-4000-8000-000000000000',
+        kind: 'choice',
+        text: HERO_STUDY.question,
+        options: [...HERO_STUDY.options],
+        context: null,
+        sponsor: HERO_STUDY.sponsor,
+        price_cents: payoutCents,
+        served_at: '2026-01-01T00:00:00.000Z',
+        expires_at: '2026-01-01T00:01:00.000Z',
+      },
+    }).includes(HERO_STUDY.sponsor)
+
+  const minCols = Number(await slider.getAttribute('min'))
+  let floor = 0
+  for (let c = minCols; c <= maxCols; c++) if (showsQuestion(c)) { floor = c; break }
+  // A floor claim needs both sides, or it only says something is suppressed somewhere.
+  // These two also say the control's own range still straddles it -- a slider that
+  // started above the floor would make the interesting rung unreachable.
+  expect(floor, 'the composer never shows this study inside the slider range').toBeGreaterThan(0)
+  expect(floor, 'the slider starts at or above the floor, so the drop is off the control').toBeGreaterThan(minCols)
+
+  await slider.fill(String(floor - 1))
   const suppressed = (await pane.innerText()).trim()
-  expect(suppressed, 'a paid question is offered at a width the client shows nothing at').not.toContain('Raycast')
+  expect(suppressed, `a paid question is offered at ${floor - 1} columns, where the client shows none`).not.toContain(HERO_STUDY.sponsor)
   expect(suppressed).toContain('tickover')
 
-  await slider.fill('72')
-  expect((await pane.innerText()).trim(), 'the question does not come back where the client says it should')
-    .toContain('Raycast')
+  await slider.fill(String(floor))
+  expect((await pane.innerText()).trim(), `the question does not come back at ${floor}, where the client shows it`)
+    .toContain(HERO_STUDY.sponsor)
 
   /**
    * The replica is wide enough for the line it holds, **at the widest budget the

@@ -1,4 +1,5 @@
-import { Component, DestroyRef, afterNextRender, inject, signal } from '@angular/core'
+import { Component, DestroyRef, ElementRef, afterNextRender, inject, signal } from '@angular/core'
+import { HERO_STUDY } from '../lib/hero-study'
 import { RouterLink } from '@angular/router'
 import { PRICING, RULES, quoteStudy } from '@tickover/contract'
 import { Button, Link } from '../ui/button'
@@ -61,6 +62,12 @@ const BEATS = [0, 1600, 3600, 5400] as const
 function media(query: string): boolean | null {
   if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return null
   return window.matchMedia(query).matches
+}
+
+/** The width the prerendered control holds, or 80 when there is none to read (R413). */
+function seedCols(host: HTMLElement): number {
+  const n = Number(host.querySelector<HTMLInputElement>('[data-cols]')?.value)
+  return Number.isFinite(n) && n > 0 ? n : 80
 }
 
 @Component({
@@ -137,6 +144,15 @@ function media(query: string): boolean | null {
            numbering it carries information; a price list is a set of rows, so it is
            rows. Identical cards for content that is not identical is the kit default,
            and it throws away the one structural signal available here. -->
+      <!-- Neither column is reachable at 375x667 without a scroll (measured: this row's own
+           wrapper starts at 686px against a 667px frame), which is exactly the shape task 9
+           went looking for -- and exactly the shape it had to give back. A hydrate-on-viewport
+           block around either one drops its heading from the served bytes entirely: the
+           framework's own internal flag for "this pass is a server render" never reads true
+           for these two blocks in this toolchain (R410), the same gap R407 found in
+           afterNextRender's own guard, but this time inside compiled framework output this
+           page cannot add a guard to. Reverted rather than shipped with vanished copy on the
+           two sections that carry the pitch to each audience. -->
       <div class="grid gap-10 sm:grid-cols-2 sm:gap-12">
         <section>
           <h2 class="text-h2 text-ink-900 dark:text-ink-50">Earn while Claude thinks</h2>
@@ -200,29 +216,35 @@ export default class IndexPage {
    */
   scene = 'A terminal where a coding agent is working, and the paid question is on the bottom row. '
 
-  // A plausible study rather than a clever one. The sponsor is a name a buyer would
-  // type, which is the case spec 4.7 and the vietnamese font subsets both exist for.
-  sponsor = 'Raycast'
-  question = 'Which terminal do you reach for first?'
-  options = ['iTerm2', 'Ghostty', 'Warp']
+  sponsor = HERO_STUDY.sponsor
+  question = HERO_STUDY.question
+  options = HERO_STUDY.options
 
   /**
-   * 72 is not a round number: it is the terminal width at which this study's question
-   * stops fitting at all. Below it the composer suppresses the question and shows the
-   * idle line, because spec 4.7 makes the sponsor unconditional and the question is
-   * what gives way. The range starts just under that on purpose -- watching the
-   * question disappear rather than degrade is the most honest thing this control can
-   * show.
+   * A few rungs below the width where this study's question stops being shown at all.
+   * Under that width the composer suppresses the question and emits the idle line,
+   * because spec 4.7 makes the sponsor unconditional and the question is what gives
+   * way -- and watching it disappear rather than degrade is the most honest thing this
+   * control can show, so the range has to start under it.
    *
-   * This said 66, and 66 was measured on a budget the client never uses: the pane was
-   * composing at the raw slider value while the daemon composes at that value minus
-   * `STATUS_LINE_SAFETY_MARGIN`. `mw-pane` resolves the width the same way the daemon
-   * does now (R358), so the floor moved six columns and the range moved with it --
-   * 60 would have left twelve identical idle lines below the interesting part.
+   * Deliberately not written as "n is the floor". It said 66, then 72, and both went
+   * stale: 66 was measured on a budget the client never uses (R358, closed by resolving
+   * the width in `mw-pane` the way the daemon does), and 72 stopped being true when the
+   * product was renamed, because every composed line is prefixed with its name and
+   * `tickover` is a character shorter than `meanwhile` (R383). The floor is a function
+   * of the composer and of this study; `e2e/public.spec.ts` now derives it from both
+   * rather than restating it.
    */
   minCols = 68
   maxCols = 120
-  cols = signal(80)
+  /**
+   * R413, the width control's half of R411: seeded from the prerendered control, not from 80. The
+   * page takes a drag before it hydrates (R400); hydration keeps the element, the first render then
+   * writes this signal into it, and the replayed input event reads that value back -- so starting
+   * from 80 put every early drag back to 80. The host element, never the global document (R407). A
+   * page created fresh, with no child yet, gets 80.
+   */
+  cols = signal(seedCols(inject(ElementRef).nativeElement as HTMLElement))
   beat = signal(0)
   private timers: ReturnType<typeof setTimeout>[] = []
 

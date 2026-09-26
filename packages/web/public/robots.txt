@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /app
+Disallow: /dev
+Allow: /developers
+Disallow: /admin
+Disallow: /api
+
+Sitemap: https://tickover.dev/sitemap.xml

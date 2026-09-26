@@ -21,6 +21,22 @@ async function renderWith(body: Record<string, unknown>, status = 200) {
 }
 
 describe('DataPage', () => {
+  // R400/R407: the constructor used to call the API directly, which a build-time render also runs.
+  // `afterNextRender` defers registering the request until after the page has rendered once. Both
+  // halves belong in one synchronous test: `whenStable()` cannot be awaited between them, because
+  // the pending fetch `PendingTasks.run` reports would then block stability forever with nothing in
+  // this test left to flush it -- a real deadlock, caught by running exactly this instead. Against
+  // the old constructor the first assertion fails: the request is already open before `detectChanges`
+  // ever runs.
+  it('issues no request at construction, and exactly one once the page has rendered', () => {
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])] })
+    const fixture = TestBed.createComponent(DataPage)
+    const http = TestBed.inject(HttpTestingController)
+    http.expectNone('/api/public/aggregates')
+    fixture.detectChanges()
+    http.expectOne('/api/public/aggregates')
+  })
+
   it('renders one card per profile question with bars and totals', async () => {
     TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])] })
     const fixture = TestBed.createComponent(DataPage)

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeAll } from 'vitest'
 import { spawn } from 'node:child_process'
 import http from 'node:http'
 import net from 'node:net'
@@ -48,6 +48,48 @@ async function fakeDaemon(line: string) {
   return { port: (server.address() as AddressInfo).port, urls, close: () => new Promise<void>((r) => server.close(() => r())) }
 }
 
+// Every upper bound below is "this path's own budget, plus a little". On a loaded runner the
+// cost of *starting Node* dwarfs the little, and an absolute bound silently becomes a test of the
+// runner's spare capacity: windows-latest spent 3268ms on a 1000ms timeout and failed `< 1800`
+// with nothing wrong. That job gates the release images, so a spurious red there costs a whole
+// rebuild -- it did, on v0.2.1 (R23, plan 3 (client)).
+//
+// So the startup cost is measured here instead of assumed, and the bounds are stated relative to
+// it. Two baselines, because the wrapped-command tests pay for a second Node start: the fastest
+// possible trip through this script with a wrapped command, and without one. Slowest of three
+// runs, because a baseline that happens to come in fast is exactly what turns these back into
+// flakes. The lower bounds stay absolute -- startup only ever pushes the elapsed time up, so a
+// `>= 900` still says the timeout it is watching really did elapse.
+//
+// Measured while making the change, because it is not what the bounds look like they do: with the
+// 1400ms hard stop in place, most of these upper bounds are the SECOND thing to notice a break.
+// Deleting the wrapped command's kill, and widening the fetch abort from 1000ms to 9000ms, both go
+// red on stdout first -- the hard stop fires and the line comes back empty. The one upper bound
+// that catches a mutation alone is the concurrency bound: awaiting the two in series instead of
+// Promise.all leaves stdout correct and shows up only as 1464ms. The lower bounds are the other
+// assertions here that carry a claim of their own -- without them an implementation that gave up
+// instantly would pass. The rest are defence in depth against the hard stop itself regressing,
+// which is worth keeping and is not worth mistaking for the primary guard.
+let baseNoWrap = 0
+let baseWrap = 0
+
+async function slowestOfThree(f: () => Promise<{ ms: number }>) {
+  let worst = 0
+  for (let i = 0; i < 3; i++) worst = Math.max(worst, (await f()).ms)
+  return worst
+}
+
+beforeAll(async () => {
+  // No daemon.json: the script prints the daemon-off line without a fetch, so what is left is
+  // process start plus parse plus one config read.
+  const plain = mkdtempSync(join(tmpdir(), 'mw-sl-base-'))
+  baseNoWrap = await slowestOfThree(() => run(plain))
+  // The same, plus a wrapped command that starts Node and exits without writing anything.
+  const wrapped = mkdtempSync(join(tmpdir(), 'mw-sl-base-'))
+  writeFileSync(join(wrapped, 'config.json'), JSON.stringify({ wrappedStatusLine: { type: 'command', command: `node -e ""` } }))
+  baseWrap = await slowestOfThree(() => run(wrapped))
+}, 60_000)
+
 describe('statusline.mjs', () => {
   it('prints the daemon line, forwards session and version, never the repo', async () => {
     const d = await fakeDaemon('tickover · today 1/10 · balance $0.50')
@@ -56,7 +98,8 @@ describe('statusline.mjs', () => {
     const r = await run(home)
     expect(r.status).toBe(0)
     expect(r.stdout).toBe('tickover · today 1/10 · balance $0.50')
-    expect(r.ms).toBeLessThan(1800)
+    // A loopback fetch that answers at once: nothing but startup should be on the clock.
+    expect(r.ms).toBeLessThan(baseNoWrap + 500)
     expect(d.urls[0]).toBe('/v1/status?session_id=s1&version=2.1.90')
     await d.close()
   })
@@ -86,7 +129,8 @@ describe('statusline.mjs', () => {
     writeFileSync(join(home, 'config.json'), JSON.stringify({ wrappedStatusLine: { type: 'command', command: `node -e "process.stdout.write('only original')"` } }))
     const r = await run(home)
     expect(r.stdout).toBe('only original')
-    expect(r.ms).toBeLessThan(2500)
+    // Port 1 refuses immediately, so this path has no budget of its own to spend either.
+    expect(r.ms).toBeLessThan(baseWrap + 800)
   })
 
   it('does not hang when the daemon accepts the connection but never responds', async () => {
@@ -104,7 +148,7 @@ describe('statusline.mjs', () => {
     // command to fall back to the developer would otherwise get a blank line and no diagnostic.
     expect(r.stdout).toBe(DAEMON_OFF)
     expect(r.ms).toBeGreaterThanOrEqual(900)
-    expect(r.ms).toBeLessThan(1800)
+    expect(r.ms).toBeLessThan(baseNoWrap + 1400)
     // See notify.spec.ts's equivalent test: the accepted-and-ignored socket must be destroyed
     // before server.close(), or its callback (which waits for every connection to end) hangs.
     for (const s of sockets) s.destroy()
@@ -126,8 +170,9 @@ describe('statusline.mjs', () => {
     expect(r.status).toBe(0)
     expect(r.stdout).toBe('slow orig')
     expect(r.ms).toBeGreaterThanOrEqual(900)
-    // Well under 600 + 1000: proves the two ran together rather than one after the other.
-    expect(r.ms).toBeLessThan(1400)
+    // Well under 600 + 1000: proves the two ran together rather than one after the other. The
+    // margin that carries the claim is the 300ms between this bound and a serial 1600.
+    expect(r.ms).toBeLessThan(baseWrap + 1300)
     for (const s of sockets) s.destroy()
     await new Promise<void>((r2) => server.close(() => r2()))
   })
@@ -142,7 +187,7 @@ describe('statusline.mjs', () => {
     // The wrapped command never produced output and was killed, so only the daemon line prints.
     expect(r.stdout).toBe('tickover · today 1/10 · balance $0.50')
     expect(r.ms).toBeGreaterThanOrEqual(900)
-    expect(r.ms).toBeLessThan(1800)
+    expect(r.ms).toBeLessThan(baseWrap + 1400)
     await d.close()
   })
 
@@ -191,7 +236,7 @@ describe('statusline.mjs', () => {
     expect(result.status).toBe(0)
     expect(stdout).toBe('')
     // Bounded near the 1400ms hard stop, not vitest's much larger test timeout.
-    expect(result.ms).toBeLessThan(2000)
+    expect(result.ms).toBeLessThan(baseNoWrap + 1800)
   })
 })
 

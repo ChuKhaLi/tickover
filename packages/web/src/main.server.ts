@@ -4,8 +4,8 @@ import { render } from '@analogjs/router/server'
 import { App } from './app/app'
 import { config } from './app/app.config.server'
 
-// Not an SSR runtime: `ssr: false` keeps the server bundle out of production.
-// Analog still builds this environment because prerendering renders each route
-// once at build time (`vite-plugin-nitro.js:342` — the ssr environment is built
-// when `ssr` OR `prerender.routes` is set).
+// The prerender renderer, not an SSR runtime (R400, which supersedes R42 (plan 2)).
+// Each public route is rendered once at build time and shipped as a plain file;
+// no server bundle runs in production. (This file is in Tailwind's scan, so its
+// comments avoid words that name a utility.)
 export default render(App, config)

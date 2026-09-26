@@ -1,7 +1,9 @@
-// R42: with `ssr: false` every prerendered route ships `<mw-root></mw-root>` and
-// no markup, so the document head is the only part of these pages a link preview
-// can read — and spec §7 Phase 0 posts them to r/ClaudeAI, r/cursor and X. Nothing
-// else in the suite touches `index.html`; deleting every og tag was invisible.
+// Written under R42 (plan 2), when every prerendered route shipped an empty
+// `<mw-root></mw-root>` and the head was the only part of these pages a link
+// preview could read. R400 renders the bodies now, but a link preview still reads
+// only the head — and spec §7 Phase 0 posts these URLs to r/ClaudeAI, r/cursor and
+// X. Nothing else in the suite touches `index.html`; deleting every og tag was
+// invisible.
 //
 // This file watches the *emitted* files, because that is the channel the bug
 // travelled on: `index.html` was correct and all four outputs were md5-identical
@@ -12,6 +14,7 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, it, expect } from 'vitest'
 import { PAGE_META, SITE_URL } from '../../src/app/lib/page-meta'
+import { OG_IMAGE_PATH } from '../../src/app/lib/seo'
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 const source = readFileSync(resolve(packageRoot, 'index.html'), 'utf8')
@@ -28,17 +31,36 @@ const routes = Object.keys(PAGE_META)
 const emitted = routes.map(fileFor)
 
 describe('index.html', () => {
-  // It is still the shared shell every prerendered file starts from, so the tags the
-  // postbuild step rewrites all have to exist here for it to find them.
+  // It is still the shared document every render starts from, and unrendered it is the
+  // SPA fallback (R401), so it carries the whole preview set before any code runs.
   const doc = parse(source)
 
-  it('carries the whole tag set the postbuild step rewrites, plus the ones it does not', () => {
+  it('carries the whole preview tag set, before Seo writes any of it', () => {
     expect(doc.title).toBeTruthy()
-    for (const key of ['og:title', 'og:description', 'og:type', 'og:url']) {
+    for (const key of ['og:title', 'og:description', 'og:type', 'og:url', 'og:image']) {
       expect(content(doc, `meta[property="${key}"]`), `missing og tag ${key}`).toBeTruthy()
     }
     expect(content(doc, 'meta[name="description"]')).toBeTruthy()
-    expect(content(doc, 'meta[name="twitter:card"]')).toBeTruthy()
+    expect(content(doc, 'meta[name="theme-color"]')).toBeTruthy()
+    // The large card, now that there is an og:image to fill it; without one it is a blank panel.
+    expect(content(doc, 'meta[name="twitter:card"]')).toBe('summary_large_image')
+    expect(content(doc, 'meta[property="og:image"]')).toBe(`${SITE_URL}${OG_IMAGE_PATH}`)
+  })
+
+  it('paints the browser chrome the dark public background, read out of the stylesheet', () => {
+    // R367: the public pages sit on ink-950. Read from the token, so a change to it
+    // cannot leave the browser chrome on the old colour.
+    const css = readFileSync(resolve(packageRoot, 'src/styles.css'), 'utf8')
+    const token = css.match(/--color-ink-950:\s*(#[0-9A-Fa-f]{6})\s*;/)?.[1]
+    expect(token, 'styles.css no longer declares --color-ink-950 as a hex value').toBeTruthy()
+    expect(content(doc, 'meta[name="theme-color"]')).toBe(token)
+  })
+
+  it('names no canonical, because the SPA fallback is this file unrendered', () => {
+    // shell.html is served for every /app, /dev and unknown URL; a canonical here
+    // would have each of them claim the landing page. `Seo` adds the canonical per
+    // public route during the render.
+    expect(doc.querySelector('link[rel="canonical"]')).toBeNull()
   })
 
   it('defaults to the landing route, so an un-rewritten file is still coherent', () => {
@@ -59,7 +81,7 @@ describe('index.html', () => {
 // below makes: measured with `dist` renamed away, the suite reported `352 passed | 13
 // skipped (365)` and exited 0, the same total as a run that measured the artifact. A
 // missing build now fails here, naming the command, instead of disappearing.
-const inputs = ['index.html', 'vite.config.ts', 'src/app/lib/page-meta.ts', 'scripts/postbuild.ts']
+const inputs = ['index.html', 'vite.config.ts', 'src/app/lib/page-meta.ts', 'src/app/lib/seo.ts', 'src/app/lib/structured-data.ts', 'src/app/lib/page-title.ts', 'scripts/postbuild.ts']
   .map((rel) => resolve(packageRoot, rel))
   .filter(existsSync)
 const newestInput = Math.max(...inputs.map((f) => statSync(f).mtimeMs))
@@ -82,16 +104,16 @@ describe('the built artifact', () => {
     }
   })
 
-  it.each(routes)('gives %s its own title, description and og:url', (route) => {
+  it.each(routes)('gives %s its own title, description, og:url and canonical', (route) => {
     const meta = PAGE_META[route]
     const doc = parse(readBuilt(fileFor(route)))
+    const url = route === '/' ? `${SITE_URL}/` : `${SITE_URL}${route}`
     expect(doc.title).toBe(meta.title)
     expect(content(doc, 'meta[property="og:title"]')).toBe(meta.title)
     expect(content(doc, 'meta[name="description"]')).toBe(meta.description)
     expect(content(doc, 'meta[property="og:description"]')).toBe(meta.description)
-    expect(content(doc, 'meta[property="og:url"]')).toBe(
-      route === '/' ? `${SITE_URL}/` : `${SITE_URL}${route}`,
-    )
+    expect(content(doc, 'meta[property="og:url"]')).toBe(url)
+    expect(doc.querySelector('link[rel="canonical"]')?.getAttribute('href')).toBe(url)
   })
 
   // The defect: four files that each *had* a head, and it was the same head. A test
@@ -167,5 +189,31 @@ describe('the built artifact', () => {
     shared('stylesheet', (d) => d.querySelector('link[rel="stylesheet"]')?.getAttribute('href'))
     shared('module script', (d) => d.querySelector('script[type="module"]')?.getAttribute('src'))
     for (const doc of docs) expect(doc.querySelector('mw-root'), 'the SPA mount point').not.toBeNull()
+  })
+
+  // R412: the bundle is fetched as early as ever, at low priority, so the stylesheet and fonts win a
+  // contended link. A tag left at the default priority is one the simulation bills to FCP again.
+  it.each(routes)('ships %s with its entry script and modulepreloads at low fetch priority', (route) => {
+    const doc = parse(readBuilt(fileFor(route)))
+    const entry = doc.querySelectorAll('script[type="module"][src]')
+    const preloads = Array.from(doc.querySelectorAll('link[rel="modulepreload"]'))
+    expect(entry, route).toHaveLength(1)
+    expect(preloads.length, route).toBeGreaterThan(0)
+    for (const el of [...entry, ...preloads]) expect(el.getAttribute('fetchpriority'), el.outerHTML).toBe('low')
+  })
+
+  it('leaves the SPA fallback at the default priority, because it has nothing else to fetch first', () => {
+    const doc = parse(readBuilt(resolve(packageRoot, 'dist/analog/public/shell.html')))
+    expect(doc.querySelector('script[type="module"][src]')?.hasAttribute('fetchpriority')).toBe(false)
+  })
+
+  // R400 inverted the premise this file was written under: the body is no longer empty. Each
+  // route's own h1 is `e2e/seo.spec.ts`'s claim, over HTTP; this one is that the file on disk
+  // is rendered at all, which is what a `ssr: false` revert would silently undo.
+  it.each(routes)('ships %s with its body rendered, not an empty mount point', (route) => {
+    const doc = parse(readBuilt(fileFor(route)))
+    const root = doc.querySelector('mw-root')
+    expect(root?.getAttribute('ng-server-context'), route).toBe('ssr-analog')
+    expect(root?.querySelector('h1')?.textContent?.trim(), route).toBeTruthy()
   })
 })

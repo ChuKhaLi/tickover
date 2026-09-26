@@ -23,6 +23,17 @@ out-tsc/
 # Storybook's build output. `build-storybook` writes it beside package.json, the
 # same trap the .vsix line above records.
 storybook-static/
+# `pnpm --filter @tickover/web lighthouse` writes the raw per-run JSON reports here, beside
+# package.json. Not the gate's verdict -- that is stdout -- just the evidence, and it is large
+# and per-machine.
+lighthouse-results/
 
 # Playwright MCP session artefacts (page snapshots, console logs)
 .playwright-mcp/
+
+# Agent worktrees. These are real `git worktree` checkouts of this repository, so each one holds a
+# `.git` file and reads to the outer repo as an embedded repository: `git add -A` commits it as a
+# gitlink, which happened once (amended out of 0fc5b9d). `.worktrees/` above is a different path;
+# this is where the worktree tooling actually puts them. Anchored to the repo root by the slash in
+# the middle, the same rule the `**/.claude/types/` note above records.
+.claude/worktrees/

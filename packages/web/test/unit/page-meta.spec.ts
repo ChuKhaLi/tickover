@@ -1,99 +1,31 @@
-// The public pages ship as empty SPA shells (R42), so the document head *is* the
-// link preview that spec §7 Phase 0 posts to r/ClaudeAI, r/cursor and X. This spec
-// covers the pure transform the postbuild step runs over each prerendered file;
-// `head-tags.spec.ts` covers what the build actually emitted.
+// The document head is the link preview that spec §7 Phase 0 posts to r/ClaudeAI,
+// r/cursor and X. This spec covers the map the head is written from and the URL it
+// names; `src/app/lib/seo.spec.ts` covers the service that writes it (spec §2),
+// `postbuild.spec.ts` the step that checks the rendered files, and
+// `head-tags.spec.ts` what the build actually emitted.
 //
-// Everything here reads values back out of a parsed document rather than out of the
-// source string. An assertion on the authored attribute has produced three defects
-// on these pages: it reads what was typed, never what a crawler resolves.
+// The `applyPageMeta` block that used to open this file went with the function: the
+// postbuild step no longer rewrites heads, `Seo` writes them during the render. Its
+// replace-not-append and idempotency claims now live in `seo.spec.ts` ("replaces
+// rather than appends") and `postbuild.spec.ts` (preloads run twice); its escaping
+// claim has no string-building writer left to hold, since `Meta` sets attributes
+// through the DOM. The URL test survives below, against `pageUrl` directly.
 import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, it, expect } from 'vitest'
 import { PRICING, RULES, quoteStudy } from '@tickover/contract'
-import { PAGE_META, SITE_URL, applyPageMeta, pageMetaFor } from '../../src/app/lib/page-meta'
+import { PAGE_META, SITE_URL, pageMetaFor, pageUrl } from '../../src/app/lib/page-meta'
 import { formatCents } from '../../src/app/lib/money'
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
-const shell = readFileSync(resolve(packageRoot, 'index.html'), 'utf8')
 const read = (rel: string) => readFileSync(resolve(packageRoot, rel), 'utf8')
 
-const parse = (html: string) => new DOMParser().parseFromString(html, 'text/html')
-const content = (doc: Document, selector: string) =>
-  (doc.querySelector(selector) as HTMLMetaElement | null)?.content ?? null
-
-const SAMPLE = { title: 'A title', description: 'A description', path: '/developers' }
-
-describe('applyPageMeta', () => {
-  it('replaces the head tags instead of appending a second copy of each', () => {
-    const doc = parse(applyPageMeta(shell, SAMPLE, 'https://example.test'))
-    // Appending would leave two of each, and a crawler reads the first — so the
-    // preview would keep showing the landing copy with the suite green.
-    expect(doc.querySelectorAll('title')).toHaveLength(1)
-    expect(doc.querySelectorAll('meta[name="description"]')).toHaveLength(1)
-    expect(doc.querySelectorAll('meta[property="og:title"]')).toHaveLength(1)
-    expect(doc.querySelectorAll('meta[property="og:description"]')).toHaveLength(1)
-    expect(doc.querySelectorAll('meta[property="og:url"]')).toHaveLength(1)
-
-    expect(doc.title).toBe(SAMPLE.title)
-    expect(content(doc, 'meta[name="description"]')).toBe(SAMPLE.description)
-    expect(content(doc, 'meta[property="og:title"]')).toBe(SAMPLE.title)
-    expect(content(doc, 'meta[property="og:description"]')).toBe(SAMPLE.description)
-    expect(content(doc, 'meta[property="og:url"]')).toBe('https://example.test/developers')
-  })
-
-  it('produces the same document when run twice', () => {
-    // The build runs it once, but a rebuild over a already-rewritten tree must not
-    // compound. Byte equality, not tag counts: appending inside a comment would pass
-    // a count check.
-    const once = applyPageMeta(shell, SAMPLE, SITE_URL)
-    expect(applyPageMeta(once, SAMPLE, SITE_URL)).toBe(once)
-  })
-
-  it('leaves every tag it does not own exactly as it found it', () => {
-    const before = parse(shell)
-    const after = parse(applyPageMeta(shell, SAMPLE, SITE_URL))
-    const same = (selector: string, attr: string) =>
-      expect(after.querySelector(selector)?.getAttribute(attr), selector).toBe(
-        before.querySelector(selector)?.getAttribute(attr),
-      )
-    same('meta[charset]', 'charset')
-    same('meta[name="viewport"]', 'content')
-    same('base', 'href')
-    same('meta[property="og:type"]', 'content')
-    same('meta[name="twitter:card"]', 'content')
-    same('link[rel="stylesheet"]', 'href')
-    same('script[type="module"]', 'src')
-    expect(after.querySelector('mw-root'), 'the SPA mount point').not.toBeNull()
-  })
-
-  it('escapes, so a crawler reads back the string that was written', () => {
-    const tricky = { title: 'A "quoted" & <angled> title', description: '5 > 4 & "so on"', path: '/' }
-    const doc = parse(applyPageMeta(shell, tricky, SITE_URL))
-    expect(doc.title).toBe(tricky.title)
-    expect(content(doc, 'meta[property="og:title"]')).toBe(tricky.title)
-    expect(content(doc, 'meta[name="description"]')).toBe(tricky.description)
-    expect(content(doc, 'meta[property="og:description"]')).toBe(tricky.description)
-  })
-
-  it('fails loudly rather than silently skipping a tag that is not there', () => {
-    // A no-op on a missing tag is how four pages came to share one head in the
-    // first place: nothing failed, the wrong preview just shipped.
-    for (const [name, pattern] of [
-      ['title', /<title>[^<]*<\/title>/],
-      ['og:url', /<meta property="og:url"[^>]*>/],
-      ['description', /<meta\s+name="description"[\s\S]*?\/>/],
-    ] as Array<[string, RegExp]>) {
-      const stripped = shell.replace(pattern, '')
-      expect(stripped, `the ${name} probe did not remove anything`).not.toBe(shell)
-      expect(() => applyPageMeta(stripped, SAMPLE, SITE_URL), name).toThrow(new RegExp(name))
-    }
-  })
-
+describe('pageUrl', () => {
   it('builds one full https URL per route, with no doubled or missing slash', () => {
-    for (const [route, meta] of Object.entries(PAGE_META)) {
+    for (const route of Object.keys(PAGE_META)) {
       for (const base of ['https://tickover.dev', 'https://tickover.dev/']) {
-        const value = content(parse(applyPageMeta(shell, meta, base)), 'meta[property="og:url"]')!
+        const value = pageUrl(route, base)
         expect(value, `${route} from ${base}`).toBe(
           route === '/' ? 'https://tickover.dev/' : `https://tickover.dev${route}`,
         )

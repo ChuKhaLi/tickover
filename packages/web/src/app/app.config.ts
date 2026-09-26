@@ -1,5 +1,6 @@
 import { provideHttpClient, withFetch } from '@angular/common/http'
 import { ApplicationConfig, inject, provideBrowserGlobalErrorListeners } from '@angular/core'
+import { provideClientHydration, withIncrementalHydration } from '@angular/platform-browser'
 import { RedirectCommand, Router, TitleStrategy, withInMemoryScrolling, withNavigationErrorHandler, type NavigationError } from '@angular/router'
 import { provideFileRouter } from '@analogjs/router'
 import { PageMetaTitleStrategy } from './lib/page-title'
@@ -55,6 +56,10 @@ export function redirectToErrorPage(e: NavigationError): RedirectCommand | undef
 // `redirectToErrorPage` above carries the reasoning.
 export const appConfig: ApplicationConfig = {
   providers: [
+    // R400: the public routes arrive rendered. Without this the browser throws the server markup
+    // away and renders again (captured: ngh=0 on every page). Incremental hydration implies event
+    // replay, so a click before hydration is not lost.
+    provideClientHydration(withIncrementalHydration()),
     provideBrowserGlobalErrorListeners(),
     provideFileRouter(
       withInMemoryScrolling({ anchorScrolling: 'enabled', scrollPositionRestoration: 'top' }),

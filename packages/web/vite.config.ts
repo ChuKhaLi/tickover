@@ -32,11 +32,10 @@ export default defineConfig(({ mode }) => ({
       // is what actually holds this down. (`useAPIMiddleware: false` does not fix
       // it; the dev mount ignores that option and it adds a second interceptor.)
       apiPrefix: '_analog_api',
-      ssr: false,
+      ssr: true,
       static: true,
-      // Every key of PAGE_META has to be here: scripts/postbuild.ts throws for a
-      // route it was asked to write a head into and cannot find, which is what
-      // stops a page shipping the landing page's link preview (R42).
+      // R400 supersedes R42 (plan 2): these seven are rendered at build time.
+      // Every key of PAGE_META has to be here (postbuild checks both directions).
       prerender: { routes: ['/', '/developers', '/buyers', '/data', '/privacy', '/terms/developers', '/terms/buyers'] },
     }),
     tailwindcss(),

@@ -4,7 +4,7 @@
  * anyone checking a production build by hand.
  *
  * It implements exactly what `packages/server/README.md`'s Caddyfile declares —
- * `try_files {path} {path}/index.html /index.html` over `dist/analog/public` — so
+ * `try_files {path} {path}/index.html /shell.html` over `dist/analog/public` — so
  * the deployment note is executable rather than prose.
  *
  * **Both directions are pinned, by two tests, and it took a review round to get the
@@ -30,12 +30,16 @@
  * `test/unit/static-server.spec.ts` pins the script so it cannot drift back.
  *
  * Not hardened for the public internet. It binds loopback, serves one directory
- * read-only, and its one guard is the traversal check below.
+ * read-only, and its security guard is the traversal check below. Task 8 added a
+ * second guard with a different job: `/assets/*` never falls back to the shell, so a
+ * stale page asking for a chunk a deploy removed gets a 404 rather than the shell
+ * under a year-long immutable header (Review Focus 2, `cacheControlFor` below).
  */
 import { createReadStream, existsSync, statSync } from 'node:fs'
 import { createServer, type Server } from 'node:http'
 import { extname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { createGzip } from 'node:zlib'
 
 /**
  * The deployable output (R34), measured rather than assumed — and re-confirmed
@@ -63,6 +67,7 @@ const TYPES: Record<string, string> = {
   '.woff2': 'font/woff2',
   '.txt': 'text/plain; charset=utf-8',
   '.map': 'application/json; charset=utf-8',
+  '.xml': 'application/xml; charset=utf-8',
 }
 
 /**
@@ -73,6 +78,34 @@ const TYPES: Record<string, string> = {
  */
 export function contentTypeFor(file: string): string {
   return TYPES[extname(file).toLowerCase()] ?? 'application/octet-stream'
+}
+
+/** Text types worth gzipping. Images, fonts and maps are already compressed or small enough not to matter. */
+const GZIPPABLE = new Set(['.html', '.js', '.css', '.json', '.svg', '.txt', '.xml'])
+
+/**
+ * Paths that 404 when the file is missing instead of falling back to the shell. `/assets/` because
+ * a missing hashed chunk must not be answered with the shell under an immutable header, and
+ * `/.well-known/` because a well-known URI is a machine-read contract, never a client route (R415).
+ * Both Caddyfiles hold the same two blocks, and `test/unit/static-server.spec.ts` checks that.
+ */
+export const NO_FALLBACK_PREFIXES = ['/assets/', '/.well-known/'] as const
+
+/** Vite content-hashes everything under /assets/, so a name never changes meaning. Everything else can. */
+export function cacheControlFor(urlPath: string): string {
+  return urlPath.startsWith('/assets/') ? 'public, max-age=31536000, immutable' : 'no-cache'
+}
+
+/**
+ * No Content-Security-Policy here, not even report-only (R406). Under ssr:true Analog injects an
+ * inline `ng-event-dispatch-contract` script into every document, and event replay adds another.
+ * A `script-src 'self'` policy flags both on every page. Measured in review: Lighthouse 13.5 Best
+ * Practices 0.96, one CSP issue logged at console level `info`, which the e2e console checks cannot
+ * see. A policy needs build-time hashes of those scripts, which is its own piece of work.
+ */
+export const SECURITY_HEADERS: Record<string, string> = {
+  'x-content-type-options': 'nosniff',
+  'referrer-policy': 'strict-origin-when-cross-origin',
 }
 
 function isFile(path: string): boolean {
@@ -112,30 +145,65 @@ export function resolveFile(root: string, urlPath: string): string | null {
   const indexInDir = join(target, 'index.html')
   if (isFile(indexInDir)) return indexInDir
   // The SPA fallback, which is what makes `/app/**`, `/dev/**` and `/admin/**`
-  // deep-linkable at all: none of them is prerendered.
-  return join(base, 'index.html')
+  // deep-linkable at all: none of them is prerendered. It is `shell.html`, the
+  // unrendered document marked noindex, and no longer the root `index.html`: R400
+  // made that the rendered landing page, which would hand every deep link the
+  // landing markup and canonical (R401).
+  return join(base, 'shell.html')
 }
 
 export function createStaticServer(root: string): Server {
+  const base = resolve(root)
   return createServer((req, res) => {
     if (req.method !== 'GET' && req.method !== 'HEAD') {
-      res.writeHead(405, { allow: 'GET, HEAD' }).end('method not allowed')
+      res.writeHead(405, { allow: 'GET, HEAD', ...SECURITY_HEADERS }).end('method not allowed')
       return
     }
-    const file = resolveFile(root, req.url ?? '/')
+    const url = req.url ?? '/'
+    const file = resolveFile(root, url)
     if (!file) {
-      res.writeHead(403, { 'content-type': 'text/plain; charset=utf-8' }).end('forbidden')
+      res.writeHead(403, { 'content-type': 'text/plain; charset=utf-8', ...SECURITY_HEADERS }).end('forbidden')
+      return
+    }
+    // The path a browser asked for, ignoring the query string and fragment `resolveFile`
+    // already strips internally -- needed here only to decide whether this was an
+    // `/assets/*` request, not to walk the filesystem again.
+    const pathname = url.split(/[?#]/)[0] ?? '/'
+    // Review Focus 2: `resolveFile` falls back to `shell.html` for anything it cannot
+    // find, which is right for `/app/**` but wrong for a hashed asset -- a stale page
+    // asking for a chunk a deploy removed must 404, never receive the shell under the
+    // year-long immutable header below. A resolved file that did not land inside the
+    // prefix's own directory means `resolveFile` fell through to that fallback.
+    // R415: the same for `/.well-known/`, whose readers are machines that take a 200 at
+    // its word -- Lighthouse 13.5 parsed the shell as an ARD catalog and failed it.
+    const prefix = NO_FALLBACK_PREFIXES.find((p) => pathname.startsWith(p))
+    if (prefix && !file.startsWith(join(base, prefix))) {
+      res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8', ...SECURITY_HEADERS }).end(`not found: ${pathname}`)
       return
     }
     if (!isFile(file)) {
-      // Only reachable when the root has no `index.html`, i.e. nothing was built.
+      // Only reachable when the root has no `shell.html`, i.e. nothing was built.
       // Saying so beats an empty 200 that looks like a blank page.
-      res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' }).end(`not found: ${file}`)
+      res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8', ...SECURITY_HEADERS }).end(`not found: ${file}`)
       return
     }
-    res.writeHead(200, { 'content-type': contentTypeFor(file), 'cache-control': 'no-store' })
+    const headers: Record<string, string> = {
+      'content-type': contentTypeFor(file),
+      'cache-control': cacheControlFor(pathname),
+      ...SECURITY_HEADERS,
+    }
+    const gzip = GZIPPABLE.has(extname(file).toLowerCase()) && /gzip/i.test(req.headers['accept-encoding'] ?? '')
+    if (gzip) {
+      headers['content-encoding'] = 'gzip'
+      headers['vary'] = 'Accept-Encoding'
+    }
+    res.writeHead(200, headers)
     if (req.method === 'HEAD') {
       res.end()
+      return
+    }
+    if (gzip) {
+      createReadStream(file).pipe(createGzip()).pipe(res)
       return
     }
     createReadStream(file).pipe(res)
@@ -160,11 +228,15 @@ export function listen(server: Server, port: number): Promise<number> {
 const entry = process.argv[1]
 if (entry && resolve(entry) === resolve(fileURLToPath(import.meta.url))) {
   const root = resolve(process.argv[2] ?? PUBLIC_DIR)
-  if (!existsSync(join(root, 'index.html'))) {
-    // The failure this replaces is a suite of browser tests that all report an
-    // empty page, which reads as an application defect rather than a missing build.
-    console.error(`static-server: ${join(root, 'index.html')} is not there. Run \`pnpm --filter @tickover/web build\` first.`)
-    process.exit(1)
+  // Both, because they are two different documents now (R401): a tree with the
+  // landing page and no shell answers every app URL with a 404.
+  for (const doc of ['index.html', 'shell.html']) {
+    if (!existsSync(join(root, doc))) {
+      // The failure this replaces is a suite of browser tests that all report an
+      // empty page, which reads as an application defect rather than a missing build.
+      console.error(`static-server: ${join(root, doc)} is not there. Run \`pnpm --filter @tickover/web build\` first.`)
+      process.exit(1)
+    }
   }
   const port = Number(process.argv[3] ?? PORT)
   void listen(createStaticServer(root), port).then((bound) => {
