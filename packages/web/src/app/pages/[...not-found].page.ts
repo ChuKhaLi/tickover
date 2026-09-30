@@ -16,14 +16,14 @@ import { Shell } from '../ui/shell'
 @Component({
   imports: [Shell, RouterLink, Link],
   template: `
-    <mw-shell [links]="[{ href: '/data', label: 'Data' }, { href: '/buyers', label: 'For buyers' }, { href: '/app/login', label: 'Buyer sign in' }]">
+    <tk-shell [links]="[{ href: '/data', label: 'Data' }, { href: '/buyers', label: 'For buyers' }, { href: '/app/login', label: 'Buyer sign in' }]">
       <h1 class="text-h1-public text-ink-900 dark:text-ink-50">That address is not a page here</h1>
       <p class="mt-3 max-w-[68ch] text-lead text-ink-600 dark:text-ink-400">It may be an old link, or a typo. Nothing has gone wrong with your account, and nothing you were doing has been lost.</p>
       <ul class="mt-6 max-w-[68ch] space-y-2">
-        <li><a mw-link routerLink="/">What Tickover is</a></li>
-        <li><a mw-link routerLink="/developers">Get paid to answer one question while Claude works</a></li>
-        <li><a mw-link routerLink="/buyers">Ask 300 AI-native developers one question</a></li>
+        <li><a tk-link routerLink="/">What Tickover is</a></li>
+        <li><a tk-link routerLink="/developers">Get paid to answer one question while Claude works</a></li>
+        <li><a tk-link routerLink="/buyers">Ask 300 AI-native developers one question</a></li>
       </ul>
-    </mw-shell>`,
+    </tk-shell>`,
 })
 export default class NotFoundPage {}

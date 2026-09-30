@@ -3,7 +3,7 @@
  *
  * R369 moved the 68ch claim off source and into the browser, and covered the eight
  * pages a signed-out visitor can reach. The other fourteen were checked by hand
- * against a live stack, which found the `/admin` policy line and `mw-empty`'s
+ * against a live stack, which found the `/admin` policy line and `tk-empty`'s
  * sentence and then stopped being a check at all: a hand sweep is not run again.
  *
  * So the mock answers for all three principals at once. No route redirects a
@@ -14,7 +14,7 @@
  * **What makes this a sweep rather than a green light** is the second half of each
  * visit. The measure check passes by finding nothing, so a screen that rendered its
  * failure rung, or nothing at all, passes it loudly. Three things are therefore
- * asserted per screen: no `mw-async` is showing `data-load-failed`, none is still on
+ * asserted per screen: no `tk-async` is showing `data-load-failed`, none is still on
  * `data-loading`, and the mock was never asked for a path it has no answer for. A
  * fixture this file gets wrong shows up as a failed rung on the screen that reads it,
  * not as a clean sweep.
@@ -27,7 +27,7 @@ import { longProseCount, proseOverMeasure } from './measure'
  * A failed load, however the screen chose to say so.
  *
  * The first version of this read two data attributes, `data-load-failed` and
- * `data-loading`, which is what `mw-async` emits — and three of the fourteen screens
+ * `data-loading`, which is what `tk-async` emits — and three of the fourteen screens
  * say it some other way and keep their heading, so all three guards passed on a
  * screen that had rendered nothing it was swept for: `/admin/invariants` marks its
  * own banner `data-check-failed`, and `/dev/settings` and `/app/studies/new` mark
@@ -43,7 +43,7 @@ import { longProseCount, proseOverMeasure } from './measure'
  * cheerfully — which is why `the failure detector fires` below is a test and not a
  * comment.
  */
-const ERROR_TONE = 'mw-banner.bg-rejected-bg'
+const ERROR_TONE = 'tk-banner.bg-rejected-bg'
 
 /**
  * The one banner in that tone which is not a failure, and the direction of this list
@@ -147,7 +147,7 @@ test('no prose on any screen behind a session runs past the measure', async ({ p
  */
 test('the failure detector fires on each of the three ways a screen says a load failed', async ({ page }) => {
   const styles: Array<[string, string, string]> = [
-    // mw-async's own rung, which is what the first version read and the only one it read.
+    // tk-async's own rung, which is what the first version read and the only one it read.
     ['/admin/payouts', '/api/admin/payouts/batches', 'data-load-failed'],
     // A page that marks its banner with its own name instead.
     ['/admin/invariants', '/api/admin/invariants', 'data-check-failed'],
@@ -171,8 +171,8 @@ test('the failure detector fires on each of the three ways a screen says a load 
   }
 })
 
-test('the buyer empty state is swept too, and it is where mw-empty speaks', async ({ page }) => {
-  // The third of R369's violations was `mw-empty`'s sentence, which exists only when
+test('the buyer empty state is swept too, and it is where tk-empty speaks', async ({ page }) => {
+  // The third of R369's violations was `tk-empty`'s sentence, which exists only when
   // there is nothing to show — so a sweep of populated screens is exactly the sweep
   // that cannot see it. `state.studies` is the array the handler reads, so emptying
   // it here is the same server answering differently.

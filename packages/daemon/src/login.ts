@@ -1,3 +1,4 @@
+import { paths } from './paths.js'
 import { readConfig, writeConfig } from './config.js'
 import type { ServerClient } from './server-client.js'
 import type { QuestionLoop } from './question-loop.js'
@@ -38,7 +39,13 @@ export async function runLoginCli(home: string, io: { out: (s: string) => void; 
   const info = await ensureDaemon(home, { fetchFn: f, cliPath: io.cliPath })
   const headers = { 'x-tickover-token': info.token, 'content-type': 'application/json' }
   const base = `http://127.0.0.1:${info.port}`
-  const start = (await (await f(`${base}/v1/login/start`, { method: 'POST', headers })).json()) as LoginStart
+  const startRes = await f(`${base}/v1/login/start`, { method: 'POST', headers })
+  // The daemon answers 500 when it cannot reach the server (offline, server down). Reading that
+  // body as a LoginStart relayed "Open undefined and enter the code: undefined", then slept NaN ms
+  // 200 times and blamed GitHub for a timeout. Thrown for the same reason as 'closed' below: a
+  // non-zero exit is what stops `/tickover:setup` before it rewrites settings.json.
+  if (!startRes.ok) throw new Error(`Could not start a login: the Tickover server did not answer (daemon log: ${paths(home).log}). Check your connection and run tickover login again.`)
+  const start = (await startRes.json()) as LoginStart
   io.out(`Open ${start.verification_uri} and enter the code: ${start.user_code}`)
   for (let i = 0; i < 200; i++) {
     await io.sleep(start.interval_s * 1000)

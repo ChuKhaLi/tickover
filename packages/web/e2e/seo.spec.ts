@@ -74,7 +74,7 @@ for (const [route, headings] of Object.entries(H2_BELOW_FOLD)) {
 for (const path of ['/app/studies/00000000-0000-0000-0000-000000000000', '/dev', '/dev/earnings', '/admin', '/no-such-page']) {
   test(`${path} gets the unrendered shell, marked noindex`, async ({ request }) => {
     const { doc } = await raw(request, path)
-    expect(doc.querySelector('mw-root')?.children.length, path).toBe(0)
+    expect(doc.querySelector('tk-root')?.children.length, path).toBe(0)
     expect(doc.querySelector('meta[name="robots"]')?.getAttribute('content'), path).toBe('noindex')
   })
 }
@@ -159,7 +159,7 @@ for (const viewport of [{ width: 375, height: 667 }, { width: 1280, height: 720 
     await page.setViewportSize(viewport)
     await page.route('**/api/public/aggregates', (r) => r.fulfill({ json: AGGREGATES_FIXTURE }))
     await page.goto('/data')
-    await expect(page.locator('section[mw-card]')).toHaveCount(5)
+    await expect(page.locator('section[tk-card]')).toHaveCount(5)
     const cls = await page.evaluate(() => new Promise<number>((ok) => {
       let sum = 0
       new PerformanceObserver((l) => { for (const e of l.getEntries() as unknown as { value: number; hadRecentInput: boolean }[]) if (!e.hadRecentInput) sum += e.value })
@@ -180,20 +180,20 @@ test('the loading announcement is read out while pending and clears once the num
   })
   await page.goto('/data')
   await expect(page.getByRole('status')).toHaveText(/Loading the latest numbers/)
-  await expect(page.locator('section[mw-card]')).toHaveCount(5)
+  await expect(page.locator('section[tk-card]')).toHaveCount(5)
   await expect(page.getByRole('status')).toHaveCount(0)
 })
 
 // Watches the handover itself: the server sends the placeholder, the browser's own fetch replaces
 // it, and a mismatch between the two would surface as a hydration error rather than as a layout
-// number. `section[mw-card]` (not the placeholder's own divs, which never carry that selector) is
+// number. `section[tk-card]` (not the placeholder's own divs, which never carry that selector) is
 // how this tells "the real rows arrived" from "the reserved frame is still up".
 test('/data with data hydrates with no console error and no NG05xx message', async ({ page }) => {
   const errors: string[] = []
   page.on('console', (m) => { if (m.type() === 'error' || /NG05\d\d/.test(m.text())) errors.push(m.text()) })
   await page.route('**/api/public/aggregates', (r) => r.fulfill({ json: AGGREGATES_FIXTURE }))
   await page.goto('/data')
-  await expect(page.locator('section[mw-card]')).toHaveCount(5)
+  await expect(page.locator('section[tk-card]')).toHaveCount(5)
   expect(errors).toEqual([])
 })
 
@@ -274,7 +274,7 @@ test('/ revalidates and the hashed script it names is cached immutably', async (
 test('robots.txt is served as a text file, not the app shell', async ({ request }) => {
   const res = await request.get('/robots.txt')
   expect(res.headers()['content-type']).toMatch(/^text\/plain/)
-  expect(await res.text()).not.toContain('<mw-root')
+  expect(await res.text()).not.toContain('<tk-root')
 })
 
 test('the sitemap lists exactly the prerendered routes, at the canonical origin', async ({ request }) => {
@@ -323,7 +323,7 @@ for (const route of Object.keys(PAGE_META)) {
   test(`${route} has no axe violations`, async ({ page }) => {
     if (route === '/data') await page.route('**/api/public/aggregates', (r) => r.fulfill({ json: AGGREGATES_FIXTURE }))
     await hydrated(page, route)
-    if (route === '/data') await expect(page.locator('section[mw-card]')).toHaveCount(5)
+    if (route === '/data') await expect(page.locator('section[tk-card]')).toHaveCount(5)
     const { violations } = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze()
     expect(violations.map((v) => `${v.id}: ${v.nodes.length}`)).toEqual([])
   })

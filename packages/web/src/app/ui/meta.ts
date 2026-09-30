@@ -21,7 +21,7 @@ import { Directive } from '@angular/core'
  * (design system 7). One of the six had grown one back.
  */
 @Directive({
-  selector: '[mw-meta]',
+  selector: '[tk-meta]',
   host: { class: 'flex flex-wrap items-baseline gap-x-6 gap-y-1 text-small text-ink-600 dark:text-ink-400' },
 })
 export class Meta {}

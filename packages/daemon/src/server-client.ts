@@ -30,7 +30,13 @@ export function parseRetryAfterMs(header: string | null | undefined, now: Date):
 export class ServerClient {
   constructor(private baseUrl: string, private token: () => string | null, private fetchFn: typeof fetch = fetch) {}
 
-  private async call<T>(path: string, init: { method: 'GET' | 'POST' | 'PUT'; body?: unknown; auth?: boolean; timeoutMs?: number }, schema: z.ZodType<T>): Promise<T> {
+  // `z.ZodType<T, any, any>`, not the shorter `z.ZodType<T>`: the shorter form defaults the
+  // Input parameter to Output (`T`), and DeveloperSelf's `payout_method_needs_confirm` /
+  // `unclaimed_cents` `.default()` fields (Task 7) give it an Input type wider than its
+  // Output -- both fields optional. `T` was then inferred from that wider shape rather than
+  // the parsed one, so `heartbeat()`/`me()` callers got fields typed as possibly `undefined`
+  // they can never actually receive (R504, first found in the web ApiService; R519 here).
+  private async call<T>(path: string, init: { method: 'GET' | 'POST' | 'PUT'; body?: unknown; auth?: boolean; timeoutMs?: number }, schema: z.ZodType<T, any, any>): Promise<T> {
     const headers: Record<string, string> = { accept: 'application/json' }
     if (init.body !== undefined) headers['content-type'] = 'application/json'
     if (init.auth !== false) {

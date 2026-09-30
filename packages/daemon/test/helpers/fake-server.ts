@@ -64,7 +64,7 @@ function isAuthorized(req: http.IncomingMessage): boolean {
 }
 
 export async function startFakeServer(): Promise<FakeServer> {
-  const self: DeveloperSelf = { id: '00000000-0000-4000-8000-000000000001', github_login: 'octo', balance_pending_cents: 0, balance_available_cents: 0, today_paid_answers: 0, activity_tier: 'light', can_cash_out: true, payout_method: null }
+  const self: DeveloperSelf = { id: '00000000-0000-4000-8000-000000000001', github_login: 'octo', balance_pending_cents: 0, balance_available_cents: 0, today_paid_answers: 0, activity_tier: 'light', can_cash_out: true, payout_method: null, payout_method_needs_confirm: false, unclaimed_cents: 0, unclaimed_email: null }
   const f: FakeServer = {
     url: '', nextQueue: [], answers: [], heartbeats: [], skips: [], webSessionAuths: [], webSessionStatus: 0, nextCalls: [], self,
     answerResponder: (b) => ({ accepted: true, reason: 'ok', earned_cents: 50, balance_pending_cents: 50, balance_available_cents: 0, today_paid_answers: 1 }),

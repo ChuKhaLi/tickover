@@ -18,7 +18,7 @@ const STUDY_ID = '22222222-2222-4222-8222-222222222222'
 // A fixture with `questions: []` would have hidden C2 -- the quote reads both.
 const question = (i = 0) => ({ id: `1111111${i}-1111-4111-8111-111111111111`, position: i, text: 'Which tagline?', options: ['A', 'B'], context: null })
 const createdStudy = (over: Record<string, unknown> = {}) => ({
-  id: STUDY_ID, kind: 'paid', state: 'draft', title: 'Tagline test', sponsor: 'Acme DB', price_cents: 55, developer_cents: 50,
+  id: STUDY_ID, kind: 'paid', state: 'draft', title: 'Tagline test', sponsor: 'Acme DB', price_cents: 56, developer_cents: 50,
   at_cost: true, target_count: 50, respondents_completed: 0, hold_cents: 0, charged_cents: 0, refunded_cents: 0, targeting: null,
   questions: [question()], review_note: null, created_at: '2026-09-10T10:00:00.000Z', live_at: null, closed_at: null, ...over,
 })
@@ -120,16 +120,19 @@ describe('NewStudyPage', () => {
   // The brief's test, with the deadlock taken out: `submitForReview()` awaits the
   // POST it just made, so awaiting it before flushing the create waits for a
   // response only the line after it can send. The promise is held instead and
-  // awaited once every request it makes has been answered — the 402 path re-reads
-  // the balance, and that request has to be flushed too or the same deadlock comes
-  // back one call later.
+  // awaited once every request it makes has been answered.
+  //
+  // R501: submit is a 200 whether or not the study needs payment -- there is no
+  // more 402 branch, so a study that cannot be covered by credit lands in
+  // `awaiting_payment` and the buyer is sent to the study page like any other
+  // successful submit, which is where the payment panel now lives.
   it('shows the at-cost quote for a first study and submits create then submit', async () => {
-    const { fixture, page, el, http, text } = await mount({ first_study_used: false })
+    const { fixture, page, el, http, router, text } = await mount({ first_study_used: false })
     await fillValid(fixture, el)
 
-    expect(text()).toContain('$0.55')
+    expect(text()).toContain('$0.56')
     expect(text()).toContain('at cost')
-    expect(text()).toContain('$27.50')
+    expect(text()).toContain('$28.00')
 
     const done = page.submitForReview()
     await drain()
@@ -138,18 +141,11 @@ describe('NewStudyPage', () => {
     create.flush(createdStudy())
     await drain()
 
-    const submit = http.expectOne(`/api/buyer/studies/${STUDY_ID}/submit`)
-    submit.flush({ error: 'insufficient_credits', required_cents: 2750, available_cents: 100 }, { status: 402, statusText: 'Payment Required' })
-    await drain()
-    http.expectOne('/api/buyer/me').flush({ ...BUYER, credit_cents: 100 })
+    http.expectOne(`/api/buyer/studies/${STUDY_ID}/submit`).flush({ ...createdStudy(), state: 'awaiting_payment', amount_due_cents: 2800, payment_reference: 'TKO-AAAAAAAA' })
     await done
     await settle(fixture)
 
-    expect(text()).toContain('You need $27.50 in credits')
-    // The balance shown is then the one the server just sent, not the stale figure
-    // the quote panel was rendering a moment ago.
-    expect(text()).toContain('$1.00')
-    expect(text()).not.toContain('$100.00')
+    expect(router.url).toBe(`/app/studies/${STUDY_ID}`)
   })
 
   // What the server receives, not what the component holds: the draft carries
@@ -195,24 +191,24 @@ describe('NewStudyPage', () => {
   it('re-quotes as the form is edited, not only when the buyer changes', async () => {
     const { fixture, el, text } = await mount({ first_study_used: false })
     await fillValid(fixture, el)
-    expect(text()).toContain('$27.50')
+    expect(text()).toContain('$28.00')
 
     typeInto(el, 'input[name=target]', '100')
     await settle(fixture)
-    expect(text()).toContain('$55.00')
-    expect(text()).not.toContain('$27.50')
+    expect(text()).toContain('$56.00')
+    expect(text()).not.toContain('$28.00')
 
     // A second question doubles the hold again: the server multiplies by the
     // question count, and a form that ignores it under-quotes by a factor.
     button(el, '+ question').click()
     await settle(fixture)
-    expect(text()).toContain('$110.00')
+    expect(text()).toContain('$112.00')
 
     // And targeting re-prices the response itself, at cost included.
     button(el, 'typescript').click()
     await settle(fixture)
-    expect(text()).toContain('$0.80')
-    expect(text()).toContain('$160.00')
+    expect(text()).toContain('$0.81')
+    expect(text()).toContain('$162.00')
   })
 
   // R49. At cost the price is the developer share plus a flat fee, so half the
@@ -396,25 +392,23 @@ describe('NewStudyPage', () => {
     expect(router.url).toBe(`/app/studies/${STUDY_ID}`)
   })
 
-  // Where the click lands, not what the attribute says.
-  it('offers a way to buy credits when there are not enough', async () => {
+  // R501: the "Buy credits" banner is gone with the 402 branch it explained. A
+  // buyer with too little credit still lands on the study page -- there is no
+  // client-side gate left to explain, and no link to click through.
+  it('lands on the study page rather than a credits banner when payment is due', async () => {
     const { fixture, page, el, http, router, text } = await mount({ credit_cents: 100 })
     await fillValid(fixture, el)
     const done = page.submitForReview()
     await drain()
     http.expectOne('/api/buyer/studies').flush(createdStudy())
     await drain()
-    http.expectOne(`/api/buyer/studies/${STUDY_ID}/submit`).flush({ error: 'insufficient_credits', required_cents: 2750, available_cents: 100 }, { status: 402, statusText: 'Payment Required' })
-    await drain()
-    http.expectOne('/api/buyer/me').flush({ ...BUYER, credit_cents: 100 })
+    http.expectOne(`/api/buyer/studies/${STUDY_ID}/submit`).flush({ ...createdStudy(), state: 'awaiting_payment', amount_due_cents: 2800, payment_reference: 'TKO-AAAAAAAA' })
     await done
     await settle(fixture)
 
-    expect(text()).toContain('You need $27.50 in credits')
-    const link = Array.from(el.querySelectorAll('a')).find((a) => a.textContent?.includes('Buy credits'))!
-    link.click()
-    await settle(fixture)
-    expect(router.url).toBe('/app/credits')
+    expect(text()).not.toContain('You need')
+    expect(Array.from(el.querySelectorAll('a')).some((a) => a.textContent?.includes('Buy credits'))).toBe(false)
+    expect(router.url).toBe(`/app/studies/${STUDY_ID}`)
   })
 
   // The fields carry the contract's limits, not numbers retyped in the template.
@@ -491,28 +485,23 @@ describe('NewStudyPage', () => {
     await settle(fixture)
   })
 
-  // The credit path is the one the page actively steers a buyer into: top up,
-  // then click Submit again. That click must not buy a second study.
-  it('sends the same draft after topping up, not a second study', async () => {
+  // There is no more retry-after-topping-up flow: submit is a single 200 whether
+  // or not the balance covers it, so the old 402 branch's re-read of
+  // `/api/buyer/me` has nothing left to trigger it. This is the regression that
+  // branch's removal could leave behind -- a request nobody flushes -- so it is
+  // asserted directly rather than merely not appearing in the DOM.
+  it('does not re-fetch the balance when the study lands in awaiting_payment', async () => {
     const { fixture, page, el, http, router } = await mount({ credit_cents: 100 })
     flushLoadEstimate(http)
     await fillValid(fixture, el)
 
-    const first = page.submitForReview()
+    const done = page.submitForReview()
     await drain()
     http.expectOne('/api/buyer/studies').flush(createdStudy())
     await drain()
-    http.expectOne(`/api/buyer/studies/${STUDY_ID}/submit`).flush({ error: 'insufficient_credits', required_cents: 2750, available_cents: 100 }, { status: 402, statusText: 'Payment Required' })
-    await drain()
-    http.expectOne('/api/buyer/me').flush({ ...BUYER, credit_cents: 100 })
-    await first
-    await settle(fixture)
-
-    const retry = page.submitForReview()
-    await drain()
-    http.expectNone('/api/buyer/studies')
-    http.expectOne(`/api/buyer/studies/${STUDY_ID}/submit`).flush(createdStudy({ state: 'in_review' }))
-    await retry
+    http.expectOne(`/api/buyer/studies/${STUDY_ID}/submit`).flush({ ...createdStudy(), state: 'awaiting_payment', amount_due_cents: 2800, payment_reference: 'TKO-AAAAAAAA' })
+    http.expectNone('/api/buyer/me')
+    await done
     await settle(fixture)
     expect(router.url).toBe(`/app/studies/${STUDY_ID}`)
   })
@@ -624,15 +613,15 @@ describe('NewStudyPage', () => {
   // exists, quoting the form on screen is quoting a study that will not be sent.
   //
   // Measured before the fix: save at 500, drag the size back to 50, panel reads
-  // $27.50, server holds $275.00. Ten times, with no confirmation step.
+  // $28.00, server holds $280.00. Ten times, with no confirmation step.
   it('shows the hold the server will take, not the hold for a form the buyer kept editing', async () => {
     const { fixture, page, el, http, text } = await mount({ first_study_used: false })
     flushLoadEstimate(http)
     await fillValid(fixture, el)
     typeInto(el, 'input[name=target]', '500')
     await settle(fixture)
-    // At cost, one question, 500 respondents: 55c x 1 x 500.
-    expect(text()).toContain('$275.00')
+    // At cost, one question, 500 respondents: 56c x 1 x 500.
+    expect(text()).toContain('$280.00')
     // Non-vacuous baseline for the lock assertion below: editable before a study exists.
     expect((el.querySelector('input[name=target]') as HTMLInputElement).matches(':disabled')).toBe(false)
 
@@ -662,8 +651,8 @@ describe('NewStudyPage', () => {
     typeInto(el, 'input[name=target]', '50')
     await settle(fixture)
     expect(page.draft.targetCount, 'the probe did not actually change the form').toBe(50)
-    expect(text(), 'the panel quoted the edited form, not the saved study').toContain('$275.00')
-    expect(text()).not.toContain('$27.50')
+    expect(text(), 'the panel quoted the edited form, not the saved study').toContain('$280.00')
+    expect(text()).not.toContain('$28.00')
     expect(text()).toContain('for 500 respondents')
 
     // The retry sends that same 500-respondent study, which is what was quoted.
@@ -691,9 +680,9 @@ describe('NewStudyPage', () => {
     await first
     await settle(fixture)
 
-    // 55c x 2 questions x 50 respondents, not the 1 question the form shows.
-    expect(text()).toContain('$55.00')
-    expect(text()).not.toContain('$27.50')
+    // 56c x 2 questions x 50 respondents, not the 1 question the form shows.
+    expect(text()).toContain('$56.00')
+    expect(text()).not.toContain('$28.00')
     expect(page.draft.questions, 'the form still holds one question').toHaveLength(1)
   })
 

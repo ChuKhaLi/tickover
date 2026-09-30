@@ -1,7 +1,8 @@
 // Tickover hook: forwards the hook event to the local daemon. Never prints to stdout, always
 // exits 0 — this runs as SessionStart/UserPromptSubmit/Stop/SessionEnd inside someone else's
 // Claude Code session, and UserPromptSubmit stdout is injected straight into their conversation.
-import { readFileSync, existsSync } from 'node:fs'
+import { readFileSync, existsSync, writeFileSync, renameSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
 import { spawn } from 'node:child_process'
@@ -39,6 +40,23 @@ async function post(payload) {
   } catch { return false }
 }
 
+// `tickover statusline install` points Claude Code at a copy of the status line script in the
+// Tickover home, since this plugin's directory is versioned and Claude Code deletes it 14 days
+// after an update. This keeps that copy in step with the plugin that is loaded now. Only an
+// existing copy is refreshed -- creating one is setup's job, after consent -- and the write is a
+// rename, so a status line starting at the same moment reads the old file or the new, never half.
+function refreshStatusLineCopy() {
+  try {
+    const copy = join(home, 'statusline.mjs')
+    if (!existsSync(copy)) return
+    const next = readFileSync(fileURLToPath(new URL('../statusline/statusline.mjs', import.meta.url)), 'utf8')
+    if (readFileSync(copy, 'utf8') === next) return
+    const tmp = `${copy}.tmp-${process.pid}`
+    writeFileSync(tmp, next)
+    renameSync(tmp, copy)
+  } catch { /* the old copy keeps working; never disturb Claude over this */ }
+}
+
 function launch() {
   const config = readJson(join(home, 'config.json'))
   if (!config || typeof config.daemonBin !== 'string') return
@@ -54,6 +72,7 @@ try {
   let input = {}
   try { input = JSON.parse((await readStdin()) || '{}') } catch { input = {} }
   const event = typeof input.hook_event_name === 'string' ? input.hook_event_name : ''
+  if (event === 'SessionStart') refreshStatusLineCopy()
   // Only event/session_id/cwd/tool ever leave this process — never prompt, transcript_path, or
   // anything else the hook payload might carry.
   const payload = { event, session_id: String(input.session_id ?? ''), cwd: typeof input.cwd === 'string' ? input.cwd : undefined, tool: 'claude-code' }

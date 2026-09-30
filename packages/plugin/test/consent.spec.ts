@@ -92,3 +92,26 @@ describe('setup skill consent text', () => {
     expect(consentText()).toContain('https://tickover.dev/privacy')
   })
 })
+
+// Captured twice on 2026-09-29 in a real /tickover:setup: the model wrote "here's what Tickover
+// sends..." and opened AskUserQuestion with "Do you agree to the Tickover data terms shown above?"
+// -- with no terms above. Asked to show them, it did the same again. "Show the text, then ask" is
+// two instructions the model can satisfy one of; the text inside the question is one.
+describe('setup skill consent step', () => {
+  const lines = () => readFileSync(join(root, 'skills/setup/SKILL.md'), 'utf8').split(/\r?\n/)
+  const stepOf = (needle: string) => lines().findIndex((l) => l.includes(needle))
+
+  it('puts the paragraph inside the AskUserQuestion question itself', () => {
+    const step = lines()[stepOf('Show this consent text verbatim')] ?? ''
+    expect(step).toMatch(/as the `question` of AskUserQuestion/)
+  })
+
+  // The install ran before the consent step, so a developer who chose "Stop" was left with a
+  // global npm package they had never agreed to.
+  it('asks before anything is installed', () => {
+    const consent = stepOf('Show this consent text verbatim')
+    const install = stepOf('npm install -g')
+    expect(consent).toBeGreaterThan(-1)
+    expect(install).toBeGreaterThan(consent)
+  })
+})

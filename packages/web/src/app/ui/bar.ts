@@ -11,7 +11,7 @@ import { Component, input } from '@angular/core'
  * is 5.83. On the dark track it is the other way round, and `signal-400` is 4.17.
  */
 @Component({
-  selector: 'mw-bar',
+  selector: 'tk-bar',
   template: `<div aria-hidden="true" class="h-2 w-full rounded-chip bg-ink-200 dark:bg-ink-700"><div data-bar class="h-2 rounded-chip bg-signal-600 dark:bg-signal-400" [style.width.%]="pct()"></div></div>`,
 })
 export class Bar {

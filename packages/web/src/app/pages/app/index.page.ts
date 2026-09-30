@@ -29,15 +29,15 @@ function newestFirst(studies: StudyView[]): StudyView[] {
 @Component({
   imports: [RouterLink, DatePipe, Async, Button, Link, Money, PageHeader, Figure, Rows, StudyBadge],
   template: `
-    <mw-page-header heading="Studies">
-      <a mw-header-action mw-button size="sm" routerLink="/app/studies/new">New study</a>
-    </mw-page-header>
+    <tk-page-header heading="Studies">
+      <a tk-header-action tk-button size="sm" routerLink="/app/studies/new">New study</a>
+    </tk-page-header>
 
-    <!-- The ladder is mw-async's rather than this page's, and the order is why: a
+    <!-- The ladder is tk-async's rather than this page's, and the order is why: a
          rejected load leaves the list null, so a hand-rolled rung that asked
          "no studies?" first would tell a buyer they have none while the request
          was what failed. Seven screens each got that right separately. -->
-    <mw-async
+    <tk-async
       class="mt-6"
       [failed]="failed()"
       [loading]="studies() === null"
@@ -45,22 +45,22 @@ function newestFirst(studies: StudyView[]): StudyView[] {
       failedSays="Couldn't load your studies. Reload the page to try again."
       emptySays="No studies yet."
     >
-      <p mw-empty-action class="mt-1 text-small text-ink-600 dark:text-ink-400"><a mw-link routerLink="/app/studies/new">Create your first study</a>; it runs at cost.</p>
-      <table mw-rows>
-        <thead><tr><th>Title</th><th>State</th><th mw-figure>Per response</th><th mw-figure>Respondents</th><th>Created</th></tr></thead>
+      <p tk-empty-action class="mt-1 text-small text-ink-600 dark:text-ink-400"><a tk-link routerLink="/app/studies/new">Create your first study</a>; it runs at cost.</p>
+      <table tk-rows>
+        <thead><tr><th>Title</th><th>State</th><th tk-figure>Per response</th><th tk-figure>Respondents</th><th>Created</th></tr></thead>
         <tbody>
           @for (s of studies() ?? []; track s.id) {
             <tr>
               <td><a [routerLink]="['/app/studies', s.id]" class="font-medium hover:underline">{{ s.title }}</a></td>
-              <td><mw-study-badge [state]="s.state" /></td>
-              <td mw-figure><mw-money voice="data" [cents]="s.price_cents" /></td>
-              <td mw-figure>{{ s.respondents_completed }} / {{ s.target_count }}</td>
+              <td><tk-study-badge [state]="s.state" /></td>
+              <td tk-figure><tk-money voice="data" [cents]="s.price_cents" /></td>
+              <td tk-figure>{{ s.respondents_completed }} / {{ s.target_count }}</td>
               <td>{{ s.created_at | date: 'mediumDate' }}</td>
             </tr>
           }
         </tbody>
       </table>
-    </mw-async>`,
+    </tk-async>`,
 })
 export default class StudiesPage {
   private api = inject(ApiService)

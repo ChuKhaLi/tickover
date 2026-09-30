@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process'
 import http from 'node:http'
 import net from 'node:net'
 import type { AddressInfo } from 'node:net'
-import { mkdtempSync, writeFileSync, existsSync } from 'node:fs'
+import { mkdtempSync, writeFileSync, existsSync, readFileSync, mkdirSync, copyFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
@@ -14,10 +14,10 @@ const script = resolve(__dirname, '../hooks/notify.mjs')
 // deadlock: the child's request could never be serviced because the process hosting the server
 // is frozen inside spawnSync, waiting for that very child to exit. Only an async spawn lets both
 // sides make progress.
-function run(home: string, input: unknown): Promise<{ status: number | null; stdout: string; ms: number }> {
+function run(home: string, input: unknown, hook = script): Promise<{ status: number | null; stdout: string; ms: number }> {
   return new Promise((resolvePromise, reject) => {
     const started = Date.now()
-    const child = spawn(process.execPath, [script], { env: { ...process.env, TICKOVER_HOME: home } })
+    const child = spawn(process.execPath, [hook], { env: { ...process.env, TICKOVER_HOME: home } })
     let stdout = ''
     child.stdout.on('data', (c) => (stdout += c))
     child.on('error', reject)
@@ -67,6 +67,37 @@ describe('notify.mjs', () => {
     const deadline = Date.now() + 3000
     while (!existsSync(marker) && Date.now() < deadline) await sleep(50)
     expect(existsSync(marker)).toBe(true)
+  })
+
+  // `tickover statusline install` points Claude Code at a copy of the status line script under the
+  // Tickover home, because the plugin's own directory is versioned and deleted 14 days after an
+  // update. The copy then has to follow the plugin, and SessionStart is the one hook that runs from
+  // the plugin's *current* directory at the start of every session.
+  describe('keeping the installed status line copy current', () => {
+    function pluginTree(statusline: string) {
+      const root = mkdtempSync(join(tmpdir(), 'mw-plugin-tree-'))
+      mkdirSync(join(root, 'hooks')); mkdirSync(join(root, 'statusline'))
+      copyFileSync(script, join(root, 'hooks', 'notify.mjs'))
+      writeFileSync(join(root, 'statusline', 'statusline.mjs'), statusline)
+      return join(root, 'hooks', 'notify.mjs')
+    }
+
+    it('refreshes the copy on SessionStart when the plugin has a newer script', async () => {
+      const notify = pluginTree('// statusline v2\n')
+      const home = mkdtempSync(join(tmpdir(), 'mw-plugin-'))
+      writeFileSync(join(home, 'statusline.mjs'), '// statusline v1\n')
+      const r = await run(home, { hook_event_name: 'SessionStart', session_id: 'abc' }, notify)
+      expect(r.status).toBe(0)
+      expect(r.stdout).toBe('')
+      expect(readFileSync(join(home, 'statusline.mjs'), 'utf8')).toBe('// statusline v2\n')
+    })
+
+    it('never creates the copy: that is what setup does, after consent', async () => {
+      const notify = pluginTree('// statusline v2\n')
+      const home = mkdtempSync(join(tmpdir(), 'mw-plugin-'))
+      await run(home, { hook_event_name: 'SessionStart', session_id: 'abc' }, notify)
+      expect(existsSync(join(home, 'statusline.mjs'))).toBe(false)
+    })
   })
 
   it('tolerates garbage on stdin', async () => {

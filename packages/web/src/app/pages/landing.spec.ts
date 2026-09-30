@@ -8,9 +8,11 @@ import { TestBed, type ComponentFixture } from '@angular/core/testing'
 import { Router, provideRouter } from '@angular/router'
 import { RouterTestingHarness } from '@angular/router/testing'
 import { describe, it, expect } from 'vitest'
-import { ActivityTier, CREDIT_PACK_CENTS, PRICING, RULES, SITE, quoteStudy } from '@tickover/contract'
+import { ActivityTier, PRICING, RULES, SITE, quoteStudy } from '@tickover/contract'
 import { App } from '../app'
 import { appConfig } from '../app.config'
+import { PROMPT } from '../lib/hero-timeline'
+import { HERO_STUDY } from '../lib/hero-study'
 import IndexPage from './index.page'
 import DevelopersPage from './developers.page'
 import BuyersPage from './buyers.page'
@@ -107,7 +109,7 @@ async function underRealAppConfig(
     setHistoryScrollRestoration: () => {},
     setOffset: () => {},
   }
-  document.body.appendChild(document.createElement('mw-root'))
+  document.body.appendChild(document.createElement('tk-root'))
   const app = await bootstrapApplication(App, {
     providers: [appConfig.providers, { provide: ViewportScroller, useValue: scroller }],
   })
@@ -127,7 +129,7 @@ async function underRealAppConfig(
     await body({ router, anchors, positions })
   } finally {
     app.destroy()
-    document.querySelector('mw-root')?.remove()
+    document.querySelector('tk-root')?.remove()
   }
 }
 
@@ -162,19 +164,42 @@ describe('public pages', () => {
   /**
    * The hero is the one place on this site that makes a claim about what the client
    * prints, so the claim is checked against the composer rather than against a
-   * screenshot of it. `mw-pane` has its own spec for the general case; this asserts
+   * screenshot of it. `tk-pane` has its own spec for the general case; this asserts
    * that *this page* wired it to real figures -- a sponsor, the developer's actual
    * share, and a width the slider can move.
    */
   it('shows a real composed line, at a width the visitor can change', () => {
-    const text = textOf(IndexPage)
+    configure()
+    const el = render(IndexPage).nativeElement as HTMLElement
+    const text = el.textContent ?? ''
     expect(text, 'the disclosure spec 4.7 makes unconditional').toContain('tickover')
     expect(text).toContain('Terminal width')
-    // The *final* frame, not the first, and that is the rule being checked rather
-    // than an accident of this DOM: `matchMedia` is absent here, the page treats an
-    // environment it cannot ask as having asked for reduced motion, and reduced
-    // motion gets the last frame at once. So the counters have already moved.
+    // The *final* frame, and that is the rule being checked rather than an accident of this DOM:
+    // `matchMedia` is absent here, the page treats an environment it cannot ask as having asked
+    // for reduced motion, and reduced motion gets the last frame at once (R384).
     expect(text, 'motion needs consent, and "could not ask" is not consent').toContain(`today 4/${RULES.MAX_PAID_PER_DAY}`)
+    expect(el.querySelector('[data-sent]')!.textContent).toContain(PROMPT)
+    expect(el.querySelector('[data-typed]')!.textContent, 'the prompt box is empty once sent').toBe('')
+    expect(el.querySelector('[data-spinner]')!.textContent).toContain('(7s)')
+    expect(el.querySelectorAll('[data-tool].opacity-0'), 'every tool line has arrived').toHaveLength(0)
+  })
+
+  it('holds a place for the replay control without offering it where there is no motion', () => {
+    configure()
+    const el = render(IndexPage).nativeElement as HTMLElement
+    const slot = el.querySelector('[data-replay-slot]') as HTMLElement
+    expect(slot, 'the control is always in the layout, so its arrival shifts nothing').not.toBeNull()
+    expect(slot.classList.contains('invisible')).toBe(true)
+    expect(slot.querySelector('[data-replay]')!.textContent!.trim()).toBe('Replay')
+  })
+
+  it('a width drag stops the sequence on the question', () => {
+    configure()
+    const fixture = render(IndexPage)
+    fixture.componentInstance.setCols('110')
+    fixture.detectChanges()
+    const row = (fixture.nativeElement as HTMLElement).querySelector('tk-pane [data-line]')!.textContent!
+    expect(row).toContain(HERO_STUDY.sponsor)
   })
 
   it('states the developer pay, the payout terms and the data boundary', () => {
@@ -244,12 +269,36 @@ describe('public pages', () => {
     expect(text).toContain('Every study is approved by a person before it goes live')
   })
 
-  // R417: Paddle's catalogue sells credit in three packs, and its domain review compares the site's
-  // pricing with the catalogue. So the page a buyer decides from names the packs, from the contract.
-  it('names the credit packs Paddle sells, from the contract', () => {
-    const text = textOf(BuyersPage)
-    const packs = CREDIT_PACK_CENTS.map(formatCents)
-    expect(text).toContain(`Credit, bought ahead through Paddle${packs.slice(0, -1).join(', ')} or ${packs.at(-1)}`)
+  // Founding buyers (spec 2026-09-28): the outreach links here, and the h1 promises 300
+  // developers the panel does not have yet. The block says so, carries the refund promise the
+  // emails make, and sits above the review policy so a buyer arriving from an email meets it
+  // before the fine print.
+  it('tells a founding buyer the panel is new, the 14-day refund, and where to write', () => {
+    configure()
+    const el = render(BuyersPage).nativeElement as HTMLElement
+    const block = el.querySelector('#founding')
+    expect(block, 'no #founding block on /buyers').toBeTruthy()
+    expect(block!.textContent).toContain('The developer panel is new')
+    // Each term the outreach emails promise, asserted on its own so a copy edit cannot drop one:
+    // pay later, and the refund -- scoped to founding studies, which is all the offer covers.
+    expect(block!.textContent).toContain('pay only once the panel can fill it')
+    expect(block!.textContent).toContain('if a founding study does not fill within 14 days of going live, the unused part is refunded')
+    const mail = block!.querySelector('a[href^="mailto:"]')
+    expect(mail?.getAttribute('href')).toBe(`mailto:${SITE.CONTACT_EMAIL}?subject=Founding%20buyer`)
+    const policy = Array.from(el.querySelectorAll('h2')).find((h) => h.textContent === 'Review policy')!
+    expect(block!.compareDocumentPosition(policy) & Node.DOCUMENT_POSITION_FOLLOWING, 'the block sits above the review policy').toBeTruthy()
+  })
+
+  // R500: a study is paid by invoice before review, not bought ahead in a Paddle pack. The row
+  // that used to name the packs now names that, and the page names no payment provider.
+  it('names paying per study by PayPal on the buyer row, and no merchant of record', () => {
+    configure()
+    const el = render(BuyersPage).nativeElement as HTMLElement
+    const rows = Array.from(el.querySelectorAll('tr'))
+    const row = rows.find((r) => r.textContent?.includes('Pay per study'))
+    expect(row, 'no buyer row names paying per study').toBeTruthy()
+    expect(row!.textContent).toContain('By PayPal')
+    expect(el.textContent).not.toContain('Paddle')
   })
 
   it('posts a developer signup as a developer, all the way to the wire', async () => {

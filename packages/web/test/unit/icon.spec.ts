@@ -17,19 +17,20 @@ import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, it, expect } from 'vitest'
+import { tokenSource } from './token-source'
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 const read = (rel: string) => readFileSync(resolve(packageRoot, rel), 'utf8')
 
 /** The palette, off the file that defines it — so a token moving is what fails, not a copy of it. */
 const tokens = new Map<string, string>()
-for (const line of read('src/styles.css').split('\n')) {
+for (const line of tokenSource().split('\n')) {
   const found = /^\s*--color-([a-z0-9-]+):\s*(#[0-9A-Fa-f]{6})/.exec(line)
   if (found) tokens.set(found[1]!, found[2]!.toUpperCase())
 }
 const token = (name: string) => {
   const hex = tokens.get(name)
-  if (!hex) throw new Error(`src/styles.css no longer defines --color-${name}`)
+  if (!hex) throw new Error(`the token layer no longer defines --color-${name}`)
   return hex
 }
 

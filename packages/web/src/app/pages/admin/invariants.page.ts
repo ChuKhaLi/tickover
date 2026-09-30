@@ -22,19 +22,19 @@ interface Result { ok: boolean; problems: string[] }
 @Component({
   imports: [Banner, Button, PageHeader],
   template: `
-    <mw-page-header heading="Invariants">
-      <button mw-header-action type="button" data-recheck mw-button variant="secondary" size="sm" [disabled]="busy()" (click)="check()">{{ busy() ? 'Checking…' : 'Re-check' }}</button>
-    </mw-page-header>
+    <tk-page-header heading="Invariants">
+      <button tk-header-action type="button" data-recheck tk-button variant="secondary" size="sm" [disabled]="busy()" (click)="check()">{{ busy() ? 'Checking…' : 'Re-check' }}</button>
+    </tk-page-header>
     <p class="max-w-[68ch] text-small text-ink-600 dark:text-ink-400">Every developer's pending and available balances sum non-negative, every answer's hold is settled exactly once, and every cent debited as a payout is matched by a payout row or credited back. Run against the whole ledger, each time you press the button.</p>
 
     @if (failed()) {
-      <mw-banner data-check-failed class="mt-4" tone="error">
+      <tk-banner data-check-failed class="mt-4" tone="error">
         <p class="font-medium">The check did not run.</p>
         <p class="mt-1 max-w-[68ch]">This is not a clean result. The ledger has not been checked, so treat it as unknown: do not create a payout batch until this page answers.</p>
-      </mw-banner>
+      </tk-banner>
     } @else if (result(); as r) {
       @if (r.problems.length) {
-        <mw-banner data-problems class="mt-4" tone="error">
+        <tk-banner data-problems class="mt-4" tone="error">
           <p class="font-medium">The ledger does not add up: {{ r.problems.length }} problem{{ r.problems.length === 1 ? '' : 's' }}.</p>
           <p class="mt-1 max-w-[68ch]">Money has been released, reversed or paid in a way that does not reconcile. Do not create a payout batch until this is resolved — a batch debits balances these problems may be wrong about.</p>
           <!-- Capped like the two paragraphs above it, and it was not. A problem
@@ -47,15 +47,15 @@ interface Result { ok: boolean; problems: string[] }
                here, which is what broke the build once -- one ends the template
                literal this comment sits inside. -->
           <ul class="mt-2 max-w-[68ch] list-disc space-y-1 pl-5">@for (p of r.problems; track p) { <li>{{ p }}</li> }</ul>
-        </mw-banner>
+        </tk-banner>
       } @else if (r.ok) {
-        <mw-banner data-ok class="mt-4" tone="done">All ledger invariants hold.</mw-banner>
+        <tk-banner data-ok class="mt-4" tone="done">All ledger invariants hold.</tk-banner>
       } @else {
         <!-- The server derives ok from the problem count, so the two agreeing is
              the only shape it emits today. If they ever disagree, that is a bug in
              the reporter and not a clean bill of health. (No backtick anywhere in
              these comments: one would end the template literal.) -->
-        <mw-banner data-inconsistent class="mt-4" tone="error">The check reported a failure but listed no problems. Treat the ledger as unchecked and look at the server logs.</mw-banner>
+        <tk-banner data-inconsistent class="mt-4" tone="error">The check reported a failure but listed no problems. Treat the ledger as unchecked and look at the server logs.</tk-banner>
       }
     } @else {
       <p data-checking class="mt-4 text-small text-ink-600 dark:text-ink-400">Checking the ledger…</p>

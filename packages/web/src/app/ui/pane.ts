@@ -1,5 +1,13 @@
+import { NgTemplateOutlet } from '@angular/common'
 import { Component, computed, input } from '@angular/core'
 import { STATUS_LINE_SAFETY_MARGIN, formatStatusLine, resolveColumns, type ServedQuestion } from '@tickover/contract'
+
+/**
+ * What `flash` can ask for. Defined here, with the input that takes it, so the primitive every
+ * page may render owns its own vocabulary rather than borrowing it from the one page that
+ * animates it (final review M6).
+ */
+export type Flash = 'none' | 'row' | 'money'
 
 /**
  * The signature component: a replica of the status line, true to width.
@@ -30,6 +38,13 @@ import { STATUS_LINE_SAFETY_MARGIN, formatStatusLine, resolveColumns, type Serve
 const SEP = ' · '
 /** A payout, either a price (`$0.50`) or an earning (`+$0.50`). */
 const MONEY = /^\+?\$\d+\.\d\d$/
+/**
+ * The credited row's field, checkmark and figure together with no separator of their own
+ * (`formatStatusLine`: `` `tickover · ✓ +${money}` ``) -- so `MONEY` alone never matches it and
+ * this field fell through to `plain`, unflashable, until `flash` needed to light the figure and
+ * not the mark beside it (R384). Captured so the two can become two pieces.
+ */
+const CREDITED = /^(✓ )(\+\$\d+\.\d\d)$/
 
 /**
  * One character, in `em`, and **not** `ch` -- which is what this was first written in
@@ -49,12 +64,12 @@ const MONEY = /^\+?\$\d+\.\d\d$/
  * asserts in a real browser that the surface is wide enough for the line it holds,
  * because that is the only place this can be checked at all.
  */
-const ADVANCE_EM = 0.6
+export const ADVANCE_EM = 0.6
 
 type Piece = { text: string; kind: 'plain' | 'sep' | 'sponsor' | 'money' }
 
 @Component({
-  selector: 'mw-pane',
+  selector: 'tk-pane',
   template: `
     <!-- The frame is dark-theme only, and R317 is why. On paper the surface is
          ink-950 against ink-50 and needs nothing; on the dark page it is ink-950 on
@@ -87,19 +102,35 @@ type Piece = { text: string; kind: 'plain' | 'sep' | 'sponsor' | 'money' }
              Empty on every page but the landing hero, and it costs nothing when
              empty. -->
         <ng-content />
-        <div data-line class="whitespace-pre text-ink-100">
-        @for (p of pieces(); track $index) {
-          @switch (p.kind) {
-            @case ('sep') { <span class="text-ink-400">{{ p.text }}</span> }
-            @case ('sponsor') { <span class="text-signal-200">{{ p.text }}</span> }
-            @case ('money') { <span class="font-semibold text-white">{{ p.text }}</span> }
-            @default { <span>{{ p.text }}</span> }
-          }
+        <!-- fix round 1 (task 6 finding): rowState switches to a fresh copy of pieceList on every
+             state change instead of letting one long-lived @for reconcile old pieces against new
+             ones. A reused piece is a real, measured shift: when an earlier piece's rendered width
+             changes -- "today 3/10" giving way to a sponsor name is not the same width -- a later,
+             untouched piece such as the separator is pushed sideways by ordinary reflow, and the
+             Layout Instability API counts exactly that (e2e/public.spec.ts's layout-shift observer).
+             @switch's cases are separate views with nothing shared between them, so nothing carried
+             over from the old state has a previous position for the API to compare against. -->
+        <div data-line class="whitespace-pre text-ink-100" [class.tk-wash]="flash() === 'row'">
+        @switch (rowState()) {
+          @case ('question') { <ng-container *ngTemplateOutlet="pieceList" /> }
+          @case ('credited') { <ng-container *ngTemplateOutlet="pieceList" /> }
+          @default { <ng-container *ngTemplateOutlet="pieceList" /> }
         }
         </div>
       </div>
     </div>
+    <ng-template #pieceList>
+      @for (p of pieces(); track $index) {
+        @switch (p.kind) {
+          @case ('sep') { <span class="text-ink-400">{{ p.text }}</span> }
+          @case ('sponsor') { <span class="text-signal-200">{{ p.text }}</span> }
+          @case ('money') { <span class="font-semibold text-white" [class.tk-flash]="flash() === 'money'">{{ p.text }}</span> }
+          @default { <span>{{ p.text }}</span> }
+        }
+      }
+    </ng-template>
   `,
+  imports: [NgTemplateOutlet],
   host: {
     class: 'block',
     // A picture of a terminal, so it is announced as one thing in prose rather than
@@ -168,6 +199,13 @@ export class Pane {
   scene = input('')
   /** The moment after a keypress lands: `tickover · ✓ +$0.50 · today …`. */
   answeredCents = input<number | null>(null)
+  /**
+   * A moment of emphasis on the row, for the landing sequence only (R384): `row` washes the row's
+   * ground as a question lands, `money` lights the payout as it is credited. It decides a class and
+   * never a character -- the text stays the composer's, which is the one rule this component exists
+   * to keep.
+   */
+  flash = input<Flash>('none')
   todayPaid = input(0)
   pendingCents = input(0)
   availableCents = input(0)
@@ -206,11 +244,25 @@ export class Pane {
   )
 
   /**
+   * Which of the three shapes `line()` is in, mirroring `formatStatusLine`'s own branching
+   * (`loggedIn` is always true here, so that arm never applies). Not read for its text -- `pieces()`
+   * still owns that -- only so the template can put each shape in a view of its own (fix round 1,
+   * task 6 finding; see the template comment above `[class.tk-wash]`).
+   */
+  rowState = computed<'question' | 'credited' | 'idle'>(() =>
+    this.served() ? 'question' : this.answeredCents() !== null ? 'credited' : 'idle',
+  )
+
+  /**
    * The line split on its separator, with the separators kept as pieces of their own
    * so that rejoining is exact. The sponsor is found by position, and the position is
    * a fact about the composer rather than a guess: a paid question's prefix is
    * `tickover`, the sponsor, the payout -- so when there is a paid question, the
    * second field is the sponsor, truncated to whatever fitted.
+   *
+   * The credited field is checked first and, when it matches, split into two pieces
+   * of its own (see `CREDITED`) so the mark and the figure can be coloured -- and
+   * flashed -- separately without disturbing the sponsor-by-position rule below it.
    */
   pieces = computed<Piece[]>(() => {
     const fields = this.line().split(SEP)
@@ -218,6 +270,11 @@ export class Pane {
     const out: Piece[] = []
     fields.forEach((text, i) => {
       if (i > 0) out.push({ text: SEP, kind: 'sep' })
+      const credited = CREDITED.exec(text)
+      if (credited) {
+        out.push({ text: credited[1]!, kind: 'plain' }, { text: credited[2]!, kind: 'money' })
+        return
+      }
       out.push({ text, kind: i === sponsorAt ? 'sponsor' : MONEY.test(text) ? 'money' : 'plain' })
     })
     return out

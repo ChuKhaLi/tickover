@@ -29,7 +29,7 @@ const targeted = quoteStudy({ targeted: true, atCost: false })
 @Component({
   imports: [Shell, Money],
   template: `
-    <mw-shell [links]="[{ href: '/developers', label: 'For developers' }, { href: '/privacy', label: 'Privacy' }]">
+    <tk-shell [links]="[{ href: '/developers', label: 'For developers' }, { href: '/privacy', label: 'Privacy' }]">
       <h1 class="text-h1-public text-ink-900 dark:text-ink-50">Developer terms</h1>
       <p class="mt-3 max-w-[68ch] text-ink-600 dark:text-ink-400">Plain terms for answering paid questions. Last updated 26 September 2026.</p>
 
@@ -39,12 +39,13 @@ const targeted = quoteStudy({ targeted: true, atCost: false })
 
       <h2 class="mt-10 text-h2 text-ink-900 dark:text-ink-50">What you are paid</h2>
       <ul class="mt-2 max-w-[68ch] list-disc space-y-1 pl-5">
-        <li><mw-money [cents]="standardCents" /> per valid answer to a paid study, or <mw-money [cents]="targetedCents" /> if the buyer targeted their audience — always {{ sharePercent }}% of the study's list price.</li>
+        <li><tk-money [cents]="standardCents" /> per valid answer to a paid study, or <tk-money [cents]="targetedCents" /> if the buyer targeted their audience — always {{ sharePercent }}% of the study's list price.</li>
         <li>A buyer running their first study at cost pays less than the list price. Your share does not change: the reduction comes out of ours, which on those studies is nothing.</li>
         <li>At most {{ maxPaidPerDay }} paid answers a day. Panel-profile questions are unpaid and capped at {{ profileMaxPerDay }} a day.</li>
         <li>Paid per answer, never per second. A longer Claude run earns nothing extra.</li>
-        <li>Payment is by PayPal, in one monthly run, once your available balance reaches <mw-money [cents]="payoutMinCents" />. Below that it stays available and rolls into the next run.</li>
+        <li>Payment is by PayPal, in one monthly run, once your available balance reaches <tk-money [cents]="payoutMinCents" />. Below that it stays available and rolls into the next run.</li>
         <li>Payment fees never come out of your share.</li>
+        <li>If PayPal cannot deliver a payout, the amount returns to your available balance and waits until you save your PayPal email again.</li>
       </ul>
       <p class="mt-2 max-w-[68ch]">The sponsor and the amount are shown with every paid question, before you answer it.</p>
 
@@ -71,7 +72,7 @@ const targeted = quoteStudy({ targeted: true, atCost: false })
 
       <h2 class="mt-10 text-h2 text-ink-900 dark:text-ink-50">The boring part</h2>
       <p class="mt-2 max-w-[68ch]">Tickover is a trading name of an independent sole proprietor based in Vietnam. Vietnamese law governs these terms. The service is provided as it is, with no promise that a question will ever be available to you, and liability is limited to money you have earned and not yet been paid. If one clause turns out to be unenforceable, the rest still stand.</p>
-    </mw-shell>`,
+    </tk-shell>`,
 })
 export default class DeveloperTermsPage {
   standardCents = standard.developerCents

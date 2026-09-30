@@ -46,7 +46,10 @@ export function renderPane(s: PaneState): string {
     options.forEach((o, i) => body.push(`  ${i + 1}  ${o}`))
   }
   if (s.message) body.push(s.message)
-  return [head, rule, ...body, rule, '1-5 answer · 0 skip · q quit'].map(fit).join('\n')
+  // Only the keys handleKey acts on: 1-N for this question's N options, and answer/skip only while
+  // there is a question. It used to read "1-5 answer · 0 skip" under any question and none.
+  const keys = q && v.logged_in ? `1-${q.options.length} answer · 0 skip · q quit` : 'q quit'
+  return [head, rule, ...body, rule, keys].map(fit).join('\n')
 }
 
 export function handleKey(key: string, s: PaneState): PaneAction {

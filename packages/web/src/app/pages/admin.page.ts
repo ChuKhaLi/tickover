@@ -28,9 +28,9 @@ const ADMIN_LINKS = [
 @Component({
   imports: [Shell, Identity, RouterOutlet],
   template: `
-    <mw-shell [links]="links()">
+    <tk-shell [links]="links()">
       @if (auth.admin()) {
-        <mw-identity
+        <tk-identity
           slot="right"
           who="operator"
           [busy]="busy()"
@@ -40,7 +40,7 @@ const ADMIN_LINKS = [
         />
       }
       <router-outlet />
-    </mw-shell>`,
+    </tk-shell>`,
 })
 export default class AdminLayout {
   auth = inject(AuthState)

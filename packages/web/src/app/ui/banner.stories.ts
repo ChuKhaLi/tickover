@@ -6,7 +6,7 @@ const meta: Meta = {
   decorators: [moduleMetadata({ imports: [Banner] })],
   argTypes: { tone: { control: 'inline-radio', options: ['error', 'warn', 'done', 'info'] }, text: { control: 'text' } },
   args: { tone: 'done', text: 'Check your email for the sign-in link. It works once and expires in 30 minutes.' },
-  render: (args) => ({ props: args, template: `<mw-banner [tone]="tone" style="max-width:36rem">{{ text }}</mw-banner>` }),
+  render: (args) => ({ props: args, template: `<tk-banner [tone]="tone" style="max-width:36rem">{{ text }}</tk-banner>` }),
 }
 export default meta
 type Story = StoryObj
@@ -26,10 +26,10 @@ export const EveryTone: Story = {
   render: () => ({
     template: `
       <div style="display:flex; flex-direction:column; gap:12px; max-width:36rem">
-        <mw-banner tone="done">Credits added.</mw-banner>
-        <mw-banner tone="warn">Payment received. Waiting for your credits to arrive.</mw-banner>
-        <mw-banner tone="error">Couldn't send this study for review, and it is still a draft. Try again.</mw-banner>
-        <mw-banner tone="info">Card payment is not configured on this deployment.</mw-banner>
+        <tk-banner tone="done">Credits added.</tk-banner>
+        <tk-banner tone="warn">Payment received. Waiting for your credits to arrive.</tk-banner>
+        <tk-banner tone="error">Couldn't send this study for review, and it is still a draft. Try again.</tk-banner>
+        <tk-banner tone="info">Card payment is not configured on this deployment.</tk-banner>
       </div>`,
   }),
 }
@@ -45,8 +45,8 @@ export const WhatTheToneAlsoDecides: Story = {
   render: () => ({
     template: `
       <div style="display:flex; flex-direction:column; gap:12px; max-width:36rem">
-        <mw-banner tone="error">role="alert" — interrupts</mw-banner>
-        <mw-banner tone="done">role="status" — waits</mw-banner>
+        <tk-banner tone="error">role="alert" — interrupts</tk-banner>
+        <tk-banner tone="done">role="status" — waits</tk-banner>
       </div>`,
   }),
 }

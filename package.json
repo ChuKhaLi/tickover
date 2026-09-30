@@ -10,7 +10,7 @@
     "build:client": "pnpm --filter @tickover/contract build && pnpm --filter tickover-cli build && pnpm --filter tickover-vscode build",
     "test:client": "pnpm --filter @tickover/contract test && pnpm --filter tickover-cli test && pnpm --filter tickover-vscode test",
     "build:web": "pnpm --filter @tickover/contract build && pnpm --filter @tickover/web build",
-    "test:web": "pnpm --filter @tickover/web test"
+    "test:web": "pnpm --filter @tickover/ui test && pnpm --filter @tickover/web test"
   },
   "devDependencies": {
     "typescript": "^5.6.3",

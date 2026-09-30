@@ -112,10 +112,22 @@ export function renderQuestionHtml(q: ServedQuestion): string {
     `<button class="opt" data-skip="1"><b>0</b><span>Skip</span></button>`
 }
 
+/**
+ * The line under the card. It used to say "Keys: 1–5 answer" under any question and under none;
+ * it names only the keys the current question takes. Shipped into the page by .name like the
+ * helpers above, so the browser and this unit-tested export are the same function.
+ */
+export function pageKeysHint(optionCount: number | null): string {
+  return optionCount
+    ? 'Keys: 1–' + optionCount + ' answer · 0 skip. Keep this tab open next to your terminal.'
+    : 'Keep this tab open next to your terminal: questions appear here while Claude works.'
+}
+
 export function renderPage(): string {
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Tickover</title>
+<link rel="icon" href="data:,">
 <style>
   :root { color-scheme: light dark; --fg: #111; --bg: #fafafa; --muted: #666; --card: #fff; --line: #ddd; --accent: #2563eb; }
   @media (prefers-color-scheme: dark) { :root { --fg: #eee; --bg: #111; --muted: #aaa; --card: #1b1b1b; --line: #333; --accent: #60a5fa; } }
@@ -138,7 +150,7 @@ export function renderPage(): string {
 <body><main>
   <header><span>tickover</span><span id="bal"></span></header>
   <div class="card" id="card">Connecting…</div>
-  <p class="hint">Keys: 1–5 answer · 0 skip. Keep this tab open next to your terminal.</p>
+  <p class="hint" id="hint">${pageKeysHint(null)}</p>
 </main>
 <script>
 (function () {
@@ -157,14 +169,16 @@ export function renderPage(): string {
   var ${isEarning.name} = ${isEarning.toString()};
   var ${answerNotice.name} = ${answerNotice.toString()};
   var ${renderQuestionHtml.name} = ${renderQuestionHtml.toString()};
+  var ${pageKeysHint.name} = ${pageKeysHint.toString()};
   var state = { view: null, answered: null, message: null };
-  var card = document.getElementById('card'), bal = document.getElementById('bal');
+  var card = document.getElementById('card'), bal = document.getElementById('bal'), hint = document.getElementById('hint');
 
   function clearCard() { while (card.firstChild) card.removeChild(card.firstChild); }
 
   function render() {
     var v = state.view;
     if (!v) { card.textContent = 'Connecting…'; return; }
+    hint.textContent = ${pageKeysHint.name}(v.logged_in && v.question ? v.question.options.length : null);
     bal.textContent = v.logged_in
       ? (state.answered !== null ? '✓ +' + ${money.name}(state.answered) + ' · ' : '') + 'today ' + v.today_paid_answers + '/10 · balance ' + ${money.name}(v.balance_pending_cents + v.balance_available_cents)
       : 'not logged in';

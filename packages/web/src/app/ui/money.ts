@@ -49,7 +49,7 @@ const VOICE: Record<MoneyVoice, string> = {
 }
 
 @Component({
-  selector: 'mw-money',
+  selector: 'tk-money',
   template: '{{ text() }}',
   host: { '[class]': 'classes()' },
 })

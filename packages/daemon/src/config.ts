@@ -3,16 +3,23 @@ import { randomBytes } from 'node:crypto'
 import { SITE } from '@tickover/contract'
 import { paths } from './paths.js'
 
+// The developer's own status line as Claude Code stored it. refreshInterval is kept because the
+// status line script re-runs a slow wrapped command on the developer's own interval, not ours.
+export interface WrappedStatusLine { type: 'command'; command: string; refreshInterval?: number; padding?: number }
+
 export interface Config {
   serverUrl: string
   apiToken: string | null
   installToken: string
-  wrappedStatusLine: { type: 'command'; command: string } | null
+  wrappedStatusLine: WrappedStatusLine | null
   daemonBin: string | null
   transcriptWatch: boolean
   // Explicit terminal width override, for a terminal whose width the status line script cannot
   // detect (COLUMNS is unset). null means "detect, else fall back" -- see resolveColumns.
   statusLineColumns: number | null
+  // Whether `tickover mods on` added CLAUDE_CODE_ENABLE_FUNCTION_HOOKS to settings.json, so
+  // `mods off` removes it only then and never a flag the developer set themselves.
+  modsEnabledByTickover: boolean
 }
 
 export interface DaemonInfo { port: number; token: string; pid: number; startedAt: string }
@@ -36,7 +43,7 @@ function writeAtomic(path: string, content: string): void {
 }
 
 function freshConfig(): Config {
-  return { serverUrl: DEFAULT_SERVER_URL, apiToken: null, installToken: randomBytes(32).toString('base64url'), wrappedStatusLine: null, daemonBin: null, transcriptWatch: false, statusLineColumns: null }
+  return { serverUrl: DEFAULT_SERVER_URL, apiToken: null, installToken: randomBytes(32).toString('base64url'), wrappedStatusLine: null, daemonBin: null, transcriptWatch: false, statusLineColumns: null, modsEnabledByTickover: false }
 }
 
 export function readConfig(home: string): Config {
@@ -65,6 +72,7 @@ export function readConfig(home: string): Config {
     daemonBin: parsed.daemonBin ?? null,
     transcriptWatch: parsed.transcriptWatch ?? false,
     statusLineColumns: parsed.statusLineColumns ?? null,
+    modsEnabledByTickover: parsed.modsEnabledByTickover ?? false,
   }
   // installToken is a secret identity, not a stable default like serverUrl — persist it the
   // moment it's minted so a second read (or another process) doesn't get a different one.

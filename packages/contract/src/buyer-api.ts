@@ -25,7 +25,7 @@ export const StudyInput = z.object({
 })
 export type StudyInput = z.infer<typeof StudyInput>
 
-export const StudyState = z.enum(['draft', 'in_review', 'live', 'closed', 'settled', 'rejected'])
+export const StudyState = z.enum(['draft', 'awaiting_payment', 'in_review', 'live', 'closed', 'settled', 'rejected'])
 export const StudyKind = z.enum(['paid', 'profile', 'attention'])
 
 export const StudyView = z.object({
@@ -51,6 +51,14 @@ export const StudyView = z.object({
   created_at: z.string().datetime(),
   live_at: z.string().datetime().nullable(),
   closed_at: z.string().datetime().nullable(),
+  // Defaults, not required fields, so a payload from before pay-per-study (a fixture, a cached
+  // response) still parses; the server always sends all three.
+  amount_due_cents: z.number().int().default(0),
+  payment_reference: z.string().nullable().default(null),
+  // Only ever non-null for the owning buyer while the study is awaiting payment (R502).
+  payment_instructions: z.string().nullable().default(null),
+  // True only for the owning buyer, only while awaiting payment, only when PayPal is configured.
+  paypal_available: z.boolean().default(false),
 })
 export type StudyView = z.infer<typeof StudyView>
 
@@ -100,4 +108,37 @@ export const BuyerSelf = z.object({
   first_study_used: z.boolean(),
 })
 export const BuyerUpdate = z.object({ org: z.string().min(2).max(80) })
-export const CreditPack = z.object({ price_id: z.string(), cents: z.number().int().positive() })
+
+export const AdminStudyView = StudyView.extend({ buyer_email: z.string().nullable().default(null) })
+export type AdminStudyView = z.infer<typeof AdminStudyView>
+
+/** What an admin may type into Mark paid. A PayPal payment is recorded by the server (R505). */
+export const ManualPaymentMethod = z.enum(['bank_transfer', 'wise', 'payoneer', 'other'])
+export type ManualPaymentMethod = z.infer<typeof ManualPaymentMethod>
+export const PaymentMethod = z.enum([...ManualPaymentMethod.options, 'paypal'])
+export type PaymentMethod = z.infer<typeof PaymentMethod>
+
+export const MarkPaidInput = z.object({
+  cents: z.number().int().positive().max(10_000_000),
+  method: ManualPaymentMethod,
+  reference: z.string().trim().min(1).max(120),
+})
+export type MarkPaidInput = z.infer<typeof MarkPaidInput>
+
+export const PaymentView = z.object({
+  id: z.string().uuid(),
+  study_id: z.string().uuid().nullable(),
+  cents: z.number().int(),
+  method: PaymentMethod,
+  reference: z.string(),
+  recorded_at: z.string().datetime(),
+  reversed_cents: z.number().int().default(0),
+})
+export type PaymentView = z.infer<typeof PaymentView>
+
+export const MarkPaidResult = z.object({
+  study: AdminStudyView,
+  submitted: z.boolean(),
+  amount_due_cents: z.number().int(),
+})
+export type MarkPaidResult = z.infer<typeof MarkPaidResult>

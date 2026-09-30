@@ -14,22 +14,22 @@ type Aggregates = z.infer<typeof AggregatesResponse>
 @Component({
   imports: [Shell, DatePipe, Async, Bar, Card],
   template: `
-    <mw-shell [links]="[{ href: '/developers', label: 'For developers' }, { href: '/buyers', label: 'For buyers' }]">
+    <tk-shell [links]="[{ href: '/developers', label: 'For developers' }, { href: '/buyers', label: 'For buyers' }]">
       <h1 class="max-w-[24ch] text-h1-public text-ink-900 dark:text-ink-50">What AI-native developers say</h1>
       <p class="mt-3 max-w-[68ch] text-lead text-ink-600 dark:text-ink-400">Aggregates from unpaid panel-profile questions. Updated weekly. No individual answers are published.</p>
       @if (data(); as d) {
         <p class="mt-2 text-caption text-ink-600 dark:text-ink-400">Generated {{ d.generated_at | date: 'mediumDate' }}</p>
       }
-      <!-- The ladder is mw-async's, but "still waiting to hear" is not one of its rungs, so it is
+      <!-- The ladder is tk-async's, but "still waiting to hear" is not one of its rungs, so it is
            handled here rather than through the loading input: production always answers with five
            questions, and a build that never reaches the browser must show that shape rather than
-           mw-async's one-line loading paragraph (R400, spike measured CLS 0.604). failed therefore
+           tk-async's one-line loading paragraph (R400, spike measured CLS 0.604). failed therefore
            still wins over empty inside the ladder -- an outage and a body the contract rejects
            arrive the same way, and this page exists to show the panel produces data, so reporting
            either as an empty product is the one wrong answer it can give. -->
       <div class="mt-8">
         @if (failed() || data() !== null) {
-          <mw-async
+          <tk-async
             [failed]="failed()"
             [empty]="(data()?.questions ?? []).length === 0"
             failedSays="Couldn't load the latest numbers. Try again shortly."
@@ -37,21 +37,21 @@ type Aggregates = z.infer<typeof AggregatesResponse>
           >
             <div class="grid gap-6 md:grid-cols-2">
               @for (q of data()?.questions ?? []; track q.question_id) {
-                <section mw-card pad="lg">
+                <section tk-card pad="lg">
                   <h2 class="text-h3 text-ink-900 dark:text-ink-50">{{ q.text }}</h2>
                   <p class="mt-1 text-caption text-ink-600 dark:text-ink-400">{{ q.total }} {{ q.total === 1 ? 'answer' : 'answers' }}</p>
                   <ul class="mt-3 space-y-2">
                     @for (o of q.options; track $index; let i = $index) {
                       <li>
                         <div class="flex justify-between gap-4 text-small"><span>{{ o }}</span><span class="shrink-0 tabular-nums">{{ pct(q.counts[i] ?? 0, q.total) }}%</span></div>
-                        <mw-bar class="mt-1 block" [pct]="pct(q.counts[i] ?? 0, q.total)" />
+                        <tk-bar class="mt-1 block" [pct]="pct(q.counts[i] ?? 0, q.total)" />
                       </li>
                     }
                   </ul>
                 </section>
               }
             </div>
-          </mw-async>
+          </tk-async>
         } @else {
           <!-- Said once for assistive tech, outside the reserved frame below so its own child
                count -- the with-data e2e's contract for "the real answers arrived" -- stays a
@@ -63,18 +63,18 @@ type Aggregates = z.infer<typeof AggregatesResponse>
                the rendered height of a card carrying five options, the widest row production ships
                today, measured by hand in a real browser: 342px at 375px wide (one column, more text
                wrap) and 315px at 1280px wide (two columns, less wrap). A div, not a section, and the
-               mw-card attribute rather than a projected mw-card component instance: the with-data
-               e2e test counts section[mw-card] to mean "the real answers arrived", and a placeholder
+               tk-card attribute rather than a projected tk-card component instance: the with-data
+               e2e test counts section[tk-card] to mean "the real answers arrived", and a placeholder
                built from the same selector would let that count pass while the network call never
                ran. -->
           <div data-aggregates-placeholder class="grid gap-6 md:grid-cols-2" aria-hidden="true">
             @for (row of placeholderRows; track row) {
-              <div mw-card pad="lg" class="min-h-[342px] md:min-h-[315px]"></div>
+              <div tk-card pad="lg" class="min-h-[342px] md:min-h-[315px]"></div>
             }
           </div>
         }
       </div>
-    </mw-shell>`,
+    </tk-shell>`,
 })
 export default class DataPage {
   private api = inject(ApiService)

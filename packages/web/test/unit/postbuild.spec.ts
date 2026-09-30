@@ -55,10 +55,10 @@ if (emittedShell.includes('/src/main.ts') || !emittedShell.includes(ENTRY)) thro
  */
 const SERVER_CONTEXT = 'ng-server-context="ssr-analog"'
 const renderedPage = emittedShell.replace(
-  '<mw-root></mw-root>',
-  `<mw-root ng-version="22.1.5" ngh="0" ${SERVER_CONTEXT}><main><h1>page</h1></main></mw-root>`,
+  '<tk-root></tk-root>',
+  `<tk-root ng-version="22.1.5" ngh="0" ${SERVER_CONTEXT}><main><h1>page</h1></main></tk-root>`,
 )
-if (!renderedPage.includes(SERVER_CONTEXT)) throw new Error('fixture: index.html has no empty <mw-root></mw-root> to render into')
+if (!renderedPage.includes(SERVER_CONTEXT)) throw new Error('fixture: index.html has no empty <tk-root></tk-root> to render into')
 
 const escapeHtml = (v: string) => v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 
@@ -115,7 +115,7 @@ function tamper(route: string, edit: (html: string) => string) {
 }
 
 beforeEach(() => {
-  publicDir = mkdtempSync(join(tmpdir(), 'mw-postbuild-'))
+  publicDir = mkdtempSync(join(tmpdir(), 'tk-postbuild-'))
 })
 afterEach(() => {
   rmSync(publicDir, { recursive: true, force: true })
@@ -268,7 +268,7 @@ describe('the font preloads', () => {
     expect(readFileSync(stat, 'utf8'), 'and it is not rewritten either').toContain('<title>Static</title>')
   })
 
-  // The discriminator used to be the literal `<mw-root>`, which a rendered mount point no longer
+  // The discriminator used to be the literal `<tk-root>`, which a rendered mount point no longer
   // contains (it carries attributes), so a stray route slipped through. And an unrendered shell
   // that happens to be named index.html is not one of Analog's routes either.
   it('tells a route by its server context, not by an empty mount point', () => {
@@ -357,7 +357,7 @@ describe('lowerScriptPriority', () => {
 describe('writeShell', () => {
   let clientDir: string
   beforeEach(() => {
-    clientDir = mkdtempSync(join(tmpdir(), 'mw-client-'))
+    clientDir = mkdtempSync(join(tmpdir(), 'tk-client-'))
   })
   afterEach(() => {
     rmSync(clientDir, { recursive: true, force: true })
@@ -365,11 +365,11 @@ describe('writeShell', () => {
   const client = (html: string) => writeFileSync(join(clientDir, 'index.html'), html, 'utf8')
 
   it('copies the unrendered client document to shell.html and marks it noindex', () => {
-    client('<html><head><title>t</title></head><body><mw-root></mw-root></body></html>')
+    client('<html><head><title>t</title></head><body><tk-root></tk-root></body></html>')
     const out = writeShell(publicDir, clientDir)
     expect(out).toBe(join(publicDir, SHELL))
     const html = readFileSync(out, 'utf8')
-    expect(html).toContain('<mw-root></mw-root>')
+    expect(html).toContain('<tk-root></tk-root>')
     expect(html).toMatch(/<meta name="robots" content="noindex">\s*<\/head>/)
   })
 
@@ -385,7 +385,7 @@ describe('writeShell', () => {
   // writeShell always reads the pristine client document, so running it twice proves nothing. The
   // case that can actually go wrong is a client document that already carries a robots tag.
   it('replaces a robots tag the client document already has, rather than keeping it', () => {
-    client('<html><head><meta name="robots" content="index, follow"></head><body><mw-root></mw-root></body></html>')
+    client('<html><head><meta name="robots" content="index, follow"></head><body><tk-root></tk-root></body></html>')
     const html = readFileSync(writeShell(publicDir, clientDir), 'utf8')
     expect(html.match(/name="robots"/g)).toHaveLength(1)
     expect(html).toContain('<meta name="robots" content="noindex">')
@@ -396,7 +396,7 @@ describe('writeShell', () => {
     client(emittedShell)
     const doc = parse(readFileSync(writeShell(publicDir, clientDir), 'utf8'))
     expect(content(doc, 'meta[name="robots"]')).toBe('noindex')
-    expect(doc.querySelector('mw-root')?.children.length).toBe(0)
+    expect(doc.querySelector('tk-root')?.children.length).toBe(0)
   })
 })
 

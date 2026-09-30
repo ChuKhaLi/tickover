@@ -94,7 +94,7 @@ describe('GET /v1/status?cols=', () => {
   it('serves the question at all, composed whole on a normal terminal', async () => {
     // The guard on every other test in this block. Without it, a fixture that quietly serves no
     // question would make the suppression test below pass for entirely the wrong reason.
-    expect(await lineAt('120')).toBe('tickover · Acme DB · $0.50 · Which tagline? 1 Postgres, faster  2 Cached DB')
+    expect(await lineAt('120')).toBe('tickover · Acme DB · $0.50 · Which tagline? 1 Postgres, faster  2 Cached DB · answer: tickover pane')
   })
 
   it('keeps both options when no width is reported and the fallback budget bites', async () => {

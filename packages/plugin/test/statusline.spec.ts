@@ -3,10 +3,12 @@ import { spawn } from 'node:child_process'
 import http from 'node:http'
 import net from 'node:net'
 import type { AddressInfo } from 'node:net'
-import { mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, writeFileSync, readFileSync, existsSync, readdirSync, mkdirSync, utimesSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+const home0 = () => mkdtempSync(join(tmpdir(), 'mw-c-'))
 const DAEMON_OFF = 'tickover · daemon off · run: tickover status'
 const script = resolve(__dirname, '../statusline/statusline.mjs')
 const input = { session_id: 's1', version: '2.1.90', model: { id: 'claude-opus-5', display_name: 'Opus' }, cwd: 'C:/proj', workspace: { repo: { owner: 'secret', name: 'secret' } } }
@@ -177,11 +179,181 @@ describe('statusline.mjs', () => {
     await new Promise<void>((r2) => server.close(() => r2()))
   })
 
+  // Captured 2026-09-29 on a real install: the developer's `bash ~/.claude/statusline.sh` takes
+  // 2210-3502ms under Git Bash on Windows. Killed at the 1000ms budget every time, it vanished the
+  // moment Tickover was installed -- the status line they had before, gone, with no message. A
+  // command that misses the budget is now run in the background on its own interval and shown from
+  // its last result, so the render itself stays inside the budget.
+  describe('a wrapped command slower than the budget', () => {
+    const slow = (ms: number, counter: string) =>
+      `node -e "require('fs').appendFileSync(${JSON.stringify(counter).replace(/"/g, '\\"')},'x');setTimeout(()=>process.stdout.write('orig slow'),${ms})"`
+
+    // Ready once the background run has written a result for this session.
+    const cached = (home: string) => existsSync(join(home, 'wrapped')) && readdirSync(join(home, 'wrapped')).some((f) => f.endsWith('.json') && readFileSync(join(home, 'wrapped', f), 'utf8').includes('orig slow'))
+
+    async function until(f: () => boolean, ms: number) {
+      const end = Date.now() + ms
+      while (!f() && Date.now() < end) await sleep(100)
+      return f()
+    }
+
+    it('is shown from its last run instead of disappearing', async () => {
+      const d = await fakeDaemon('tickover · today 1/10 · balance $0.50')
+      const home = mkdtempSync(join(tmpdir(), 'mw-sl-'))
+      const counter = join(home, 'runs.txt')
+      writeFileSync(join(home, 'daemon.json'), JSON.stringify({ port: d.port, token: 'tok', pid: 1, startedAt: '' }))
+      writeFileSync(join(home, 'config.json'), JSON.stringify({ wrappedStatusLine: { type: 'command', command: slow(1500, counter), refreshInterval: 60 } }))
+
+      const first = await run(home)
+      expect(first.stdout).toBe('tickover · today 1/10 · balance $0.50')
+      expect(first.ms).toBeLessThan(baseWrap + 1400)
+
+      expect(await until(() => cached(home), 8000)).toBe(true)
+      const later = await run(home)
+      expect(later.stdout).toBe('orig slow\ntickover · today 1/10 · balance $0.50')
+      // Served from the cache: no wrapped command on the clock at all.
+      expect(later.ms).toBeLessThan(baseWrap + 500)
+      await d.close()
+    }, 20_000)
+
+    it('re-runs on the developer\'s own refreshInterval, not on every render', async () => {
+      const d = await fakeDaemon('tickover · x')
+      const home = mkdtempSync(join(tmpdir(), 'mw-sl-'))
+      const counter = join(home, 'runs.txt')
+      writeFileSync(join(home, 'daemon.json'), JSON.stringify({ port: d.port, token: 'tok', pid: 1, startedAt: '' }))
+      writeFileSync(join(home, 'config.json'), JSON.stringify({ wrappedStatusLine: { type: 'command', command: slow(1500, counter), refreshInterval: 60 } }))
+
+      await run(home)
+      expect(await until(() => cached(home), 8000)).toBe(true)
+      await sleep(500)
+      const before = readFileSync(counter, 'utf8').length
+      for (let i = 0; i < 4; i++) expect((await run(home)).stdout).toBe('orig slow\ntickover · x')
+      await sleep(2000)
+      // Four renders inside the 60s interval: no further run of the developer's command.
+      expect(readFileSync(counter, 'utf8').length).toBe(before)
+      await d.close()
+    }, 20_000)
+
+    // Whole-branch review C1, captured: the background run is detached, so it has no console, and a
+    // `shell: true` child of a console-less process gets a NEW, visible console window on Windows --
+    // one popping up every refresh interval, taking focus while the developer types. The probe asks
+    // Windows what console the wrapped command sees, spawned exactly as startBackground spawns it.
+    it.skipIf(process.platform !== 'win32')('runs the developer\'s command in the background without opening a window', async () => {
+      const home = mkdtempSync(join(tmpdir(), 'mw-sl-'))
+      const out = join(home, 'probe.txt')
+      const probe = resolve(__dirname, 'fixtures/console-probe.ps1')
+      writeFileSync(join(home, 'config.json'), JSON.stringify({ wrappedStatusLine: { type: 'command', command: `powershell -NoProfile -ExecutionPolicy Bypass -File "${probe}" "${out}"` } }))
+      mkdirSync(join(home, 'wrapped'))
+      const cache = join(home, 'wrapped', 's1.json')
+      writeFileSync(join(home, 'wrapped', 's1.in'), JSON.stringify(input))
+      writeFileSync(join(home, 'wrapped', 's1.lock'), '')
+      const bg = spawn(process.execPath, [script, '--refresh-wrapped', cache], { detached: true, stdio: 'ignore', windowsHide: true, env: { ...process.env, TICKOVER_HOME: home } })
+      bg.unref()
+      expect(await until(() => existsSync(cache), 15_000)).toBe(true)
+      expect(readFileSync(out, 'utf8')).toMatch(/visible=False/)
+    }, 20_000)
+
+    // The pieces below each pin one part of the background run that whole-branch review I5 mutated
+    // without a test noticing. State is written directly, so each test is about one rule.
+    function slowHome(command: string, extra: Record<string, unknown> = {}) {
+      const home = mkdtempSync(join(tmpdir(), 'mw-sl-'))
+      writeFileSync(join(home, 'config.json'), JSON.stringify({ wrappedStatusLine: { type: 'command', command, refreshInterval: 60, ...extra } }))
+      mkdirSync(join(home, 'wrapped'))
+      return home
+    }
+    const cacheOf = (home: string, sid = 's1') => join(home, 'wrapped', `${sid}.json`)
+    const writeCache = (home: string, c: unknown, sid = 's1') => writeFileSync(cacheOf(home, sid), JSON.stringify(c))
+    const runs = (counter: string) => (existsSync(counter) ? readFileSync(counter, 'utf8').length : 0)
+
+    // Review I4, captured: an inline run that timed out wrote '' over the last good output, so a
+    // command hovering around the budget lost the developer's line on every other render.
+    it('keeps the last output when an inline run times out', async () => {
+      const home = slowHome(slow(1500, join(mkdtempSync(join(tmpdir(), 'mw-c-')), 'runs.txt')))
+      writeCache(home, { output: 'orig old', at: Date.now(), slow: false })
+      const r = await run(home)
+      expect(r.stdout).toBe('orig old')
+      expect(JSON.parse(readFileSync(cacheOf(home), 'utf8')).output).toBe('orig old')
+    }, 20_000)
+
+    it('keeps each session\'s line apart', async () => {
+      const home = slowHome(slow(0, join(home0(), 'runs.txt')))
+      writeCache(home, { output: 'line of s1', at: Date.now(), slow: true }, 's1')
+      writeCache(home, { output: 'line of s2', at: Date.now(), slow: true }, 's2')
+      expect((await run(home, { ...input, session_id: 's1' })).stdout).toBe('line of s1')
+      expect((await run(home, { ...input, session_id: 's2' })).stdout).toBe('line of s2')
+    })
+
+    it('goes back to running inline once the background run finds the command fast', async () => {
+      const counter = join(home0(), 'runs.txt')
+      const home = slowHome(slow(0, counter))
+      writeCache(home, { output: 'orig slow', at: 0, slow: true })
+      await run(home)
+      expect(await until(() => existsSync(cacheOf(home)) && JSON.parse(readFileSync(cacheOf(home), 'utf8')).slow === false, 8000)).toBe(true)
+      const before = runs(counter)
+      await run(home)
+      expect(runs(counter)).toBe(before + 1)
+    }, 20_000)
+
+    it('starts no second background run while one holds the lock, and takes over a stale lock', async () => {
+      const counter = join(home0(), 'runs.txt')
+      const home = slowHome(slow(0, counter))
+      writeCache(home, { output: 'orig slow', at: 0, slow: true })
+      const lock = join(home, 'wrapped', 's1.lock')
+      writeFileSync(lock, '')
+      await run(home)
+      await sleep(2000)
+      expect(runs(counter)).toBe(0)
+      const old = new Date(Date.now() - 60_000)
+      utimesSync(lock, old, old)
+      await run(home)
+      expect(await until(() => runs(counter) === 1, 8000)).toBe(true)
+      // And released afterwards, with the copy of Claude Code's payload it ran from.
+      expect(await until(() => !existsSync(lock), 8000)).toBe(true)
+      expect(existsSync(join(home, 'wrapped', 's1.in'))).toBe(false)
+    }, 20_000)
+
+    it('never refreshes more often than every 3 seconds, whatever the developer\'s interval', async () => {
+      const counter = join(home0(), 'runs.txt')
+      const home = slowHome(slow(0, counter), { refreshInterval: 1 })
+      writeCache(home, { output: 'orig slow', at: Date.now() - 2000, slow: true })
+      await run(home)
+      await sleep(2000)
+      expect(runs(counter)).toBe(0)
+    }, 20_000)
+
+    it('prunes cache files from sessions a day old', async () => {
+      const home = slowHome(slow(0, join(home0(), 'runs.txt')))
+      writeCache(home, { output: 'orig slow', at: 0, slow: true })
+      const stale = join(home, 'wrapped', 'gone.json')
+      writeFileSync(stale, '{}')
+      const old = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000)
+      utimesSync(stale, old, old)
+      await run(home)
+      expect(await until(() => !existsSync(stale), 8000)).toBe(true)
+    }, 20_000)
+
+    it('a fast wrapped command is still run on every render, never from a cache', async () => {
+      const d = await fakeDaemon('tickover · x')
+      const home = mkdtempSync(join(tmpdir(), 'mw-sl-'))
+      const counter = join(home, 'runs.txt')
+      writeFileSync(join(home, 'daemon.json'), JSON.stringify({ port: d.port, token: 'tok', pid: 1, startedAt: '' }))
+      writeFileSync(join(home, 'config.json'), JSON.stringify({ wrappedStatusLine: { type: 'command', command: slow(0, counter), refreshInterval: 60 } }))
+      for (let i = 0; i < 3; i++) expect((await run(home)).stdout).toBe('orig slow\ntickover · x')
+      expect(readFileSync(counter, 'utf8').length).toBe(3)
+      expect(existsSync(join(home, 'wrapped'))).toBe(false)
+      await d.close()
+    }, 20_000)
+  })
+
   it('kills a genuinely hanging wrapped command at its own timeout instead of waiting forever', async () => {
     const d = await fakeDaemon('tickover · today 1/10 · balance $0.50')
     const home = mkdtempSync(join(tmpdir(), 'mw-sl-'))
     writeFileSync(join(home, 'daemon.json'), JSON.stringify({ port: d.port, token: 'tok', pid: 1, startedAt: '' }))
-    writeFileSync(join(home, 'config.json'), JSON.stringify({ wrappedStatusLine: { type: 'command', command: `node -e "setInterval(() => {}, 1000)"` } }))
+    // 3s rather than forever: the render still has to kill it at 1000ms, but a timeout now also
+    // starts a background run of the same command (R701), and one that never ends outlived the
+    // test by 15s -- a leaked process the whole-branch review found (I5) and a likely source of this
+    // file's timing flakes.
+    writeFileSync(join(home, 'config.json'), JSON.stringify({ wrappedStatusLine: { type: 'command', command: `node -e "setTimeout(() => {}, 3000)"` } }))
     const r = await run(home)
     expect(r.status).toBe(0)
     // The wrapped command never produced output and was killed, so only the daemon line prints.

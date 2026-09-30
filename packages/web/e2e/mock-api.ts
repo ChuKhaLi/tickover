@@ -142,6 +142,10 @@ export const LIVE_STUDY: StudyView = {
   created_at: '2026-09-10T10:00:00.000Z',
   live_at: '2026-09-12T10:00:00.000Z',
   closed_at: null,
+  amount_due_cents: 0,
+  payment_reference: null,
+  payment_instructions: null,
+  paypal_available: false,
 }
 
 const REVIEW_STUDY: StudyView = {
@@ -184,6 +188,8 @@ export interface MockState {
   studies: StudyView[]
   /** Any `/api/**` path this file has no answer for. A non-empty list is a defect in one of the two. */
   unhandled: string[]
+  /** Whether `/submit` answers with a study still needing payment rather than `in_review`. */
+  uncovered: boolean
 }
 
 export interface MockOptions {
@@ -202,6 +208,12 @@ export interface MockOptions {
   failing?: string[]
   /** The waitlist endpoint's reply. 500 is what proves the success assertion is not vacuous. */
   waitlistStatus?: number
+  /** A submit the credit does not cover: the study comes back `awaiting_payment` rather than `in_review`. */
+  uncovered?: boolean
+  /** R505: whether a waiting study offers `paypal_available: true`, and the order route answers. */
+  paypal?: boolean
+  /** R514: whether the first payout batch is one the server calls sendable via PayPal. */
+  sendableBatch?: boolean
 }
 
 /**
@@ -243,6 +255,10 @@ function studyFrom(input: unknown, state: StudyView['state']): StudyView {
     created_at: '2026-09-10T10:00:00.000Z',
     live_at: null,
     closed_at: null,
+    amount_due_cents: 0,
+    payment_reference: null,
+    payment_instructions: null,
+    paypal_available: false,
   }
 }
 
@@ -251,7 +267,12 @@ export async function mockApi(page: Page, opts: MockOptions = {}): Promise<MockS
   const devSignedIn = opts.devSignedIn ?? false
   const adminSignedIn = opts.adminSignedIn ?? false
   const waitlistStatus = opts.waitlistStatus ?? 200
-  const state: MockState = { waitlistPosts: [], studies: [...(opts.studies ?? [])], unhandled: [] }
+  const paypal = opts.paypal ?? false
+  const state: MockState = { waitlistPosts: [], studies: [...(opts.studies ?? [])], unhandled: [], uncovered: opts.uncovered ?? false }
+  // Mutable, unlike `BATCHES` itself: a send has to be reflected on the next list
+  // fetch, the way `state.studies` reflects a create, or the button this page
+  // put up after Send would revert to the one that put it there (R514).
+  let batchRows: unknown[] = opts.sendableBatch ? [{ ...BATCHES[0], sendable: true }, BATCHES[1]] : [...BATCHES]
 
   const json = (route: Route, status: number, body: unknown) =>
     route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) })
@@ -301,9 +322,16 @@ export async function mockApi(page: Page, opts: MockOptions = {}): Promise<MockS
     if (path.endsWith('/submit')) {
       const draft = state.studies[0]
       if (!draft) return json(route, 404, { error: 'not_found' })
-      const sent = { ...draft, state: 'in_review' as const }
+      const sent = state.uncovered
+        ? { ...draft, state: 'awaiting_payment' as const, amount_due_cents: 2800, payment_reference: 'TKO-TEST0001', payment_instructions: 'Bank A\nAccount 123', paypal_available: paypal }
+        : { ...draft, state: 'in_review' as const }
       state.studies[0] = sent
       return json(route, 200, sent)
+    }
+    // R505: the buyer clicks "Pay with PayPal" and the page redirects to this url --
+    // `buyer.spec.ts` asserts the real navigation, so the token is fixed rather than random.
+    if (path.endsWith('/paypal/order') && method === 'POST') {
+      return json(route, 200, { approve_url: 'https://www.sandbox.paypal.com/checkoutnow?token=ORDER-E2E' })
     }
     // Before the study-by-id branch, which this path also starts with: answering it
     // with a StudyView leaves the page parsing a study as results, and the page
@@ -316,7 +344,7 @@ export async function mockApi(page: Page, opts: MockOptions = {}): Promise<MockS
       const study = state.studies[0]
       return study ? json(route, 200, study) : json(route, 404, { error: 'not_found' })
     }
-    if (path === '/api/buyer/credits/packs') return json(route, 200, [{ price_id: 'pri_small', cents: 5000 }])
+    if (path === '/api/buyer/payments') return json(route, 200, [])
 
     // The developer web session. `tickover web` trades the CLI token for a link and
     // everything past that is a cookie, so from the page's side it is just these.
@@ -339,7 +367,12 @@ export async function mockApi(page: Page, opts: MockOptions = {}): Promise<MockS
     }
     if (path === '/api/admin/system-studies') return json(route, 200, [PROFILE_STUDY])
     if (path === '/api/admin/developers') return json(route, 200, ADMIN_DEVELOPERS)
-    if (path === '/api/admin/payouts/batches' && method === 'GET') return json(route, 200, BATCHES)
+    if (path === '/api/admin/payouts/batches' && method === 'GET') return json(route, 200, batchRows)
+    if (path.startsWith('/api/admin/payouts/batches/') && path.endsWith('/send') && method === 'POST') {
+      const sent = { ...BATCHES[0], sent_at: '2026-09-10T11:00:00.000Z', provider_batch_id: 'PB-1', confirmed: true, sendable: false, refreshable: true }
+      batchRows = [sent, BATCHES[1]]
+      return json(route, 200, sent)
+    }
     if (path === '/api/admin/invariants') return json(route, 200, INVARIANTS)
     if (path === '/api/public/aggregates') {
       return json(route, 200, { generated_at: '2026-09-10T10:00:00.000Z', questions: [AGGREGATE_QUESTION] })

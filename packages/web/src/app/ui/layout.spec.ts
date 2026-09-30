@@ -1,12 +1,12 @@
-// The six primitives that give a screen its shape: `mw-card`, `mw-page-header`,
-// `mw-stat`, `mw-empty`, `mw-async`, and the data-grid pair `mw-rows` / `mw-figure`.
+// The six primitives that give a screen its shape: `tk-card`, `tk-page-header`,
+// `tk-stat`, `tk-empty`, `tk-async`, and the data-grid pair `tk-rows` / `tk-figure`.
 //
 // Separate from `primitives.spec.ts` only because that file is already 22 tests about
 // controls and colour; these are about structure. What each of them is *coloured*
 // with is asserted in `test/unit/tokens.spec.ts`, which enumerates roles from the
 // source, so nothing here re-checks a contrast ratio.
 //
-// The weight of this file is on `mw-async`. The other five are shapes, and a shape
+// The weight of this file is on `tk-async`. The other five are shapes, and a shape
 // that comes out wrong is visible; the ladder is a *rule*, it is invisible when wrong,
 // and it is wrong in the direction that tells a developer they have earned nothing.
 import { Component, signal, type Type } from '@angular/core'
@@ -33,14 +33,14 @@ const flat = (el: Element | null) => (el?.textContent ?? '').replace(/\s+/g, ' '
 @Component({
   imports: [Card],
   template: `
-    <article mw-card data-default>a panel</article>
-    <li mw-card pad="none" rank="raised" class="list-none" data-bare>a row that pads itself</li>`,
+    <article tk-card data-default>a panel</article>
+    <li tk-card pad="none" rank="raised" class="list-none" data-bare>a row that pads itself</li>`,
 })
 class CardHost {}
 
-describe('mw-card', () => {
+describe('tk-card', () => {
   /**
-   * The directive shape, tested the way `mw-button`'s is: a panel is an `<article>`,
+   * The directive shape, tested the way `tk-button`'s is: a panel is an `<article>`,
    * a `<section>` or an `<li>` depending on what it holds, and a component that
    * wrapped one would both take that choice away and break the `<li>` case outright,
    * since a `<ul>` may only contain list items.
@@ -64,14 +64,14 @@ describe('mw-card', () => {
 @Component({
   imports: [PageHeader],
   template: `
-    <mw-page-header heading="Earnings">
-      <span mw-header-aside data-aside>live</span>
-      <button mw-header-action data-action>New study</button>
-    </mw-page-header>`,
+    <tk-page-header heading="Earnings">
+      <span tk-header-aside data-aside>live</span>
+      <button tk-header-action data-action>New study</button>
+    </tk-page-header>`,
 })
 class HeaderHost {}
 
-describe('mw-page-header', () => {
+describe('tk-page-header', () => {
   it('puts the heading in an h1 and both slots where they were selected to go', () => {
     const { el } = mount(HeaderHost)
     const h1 = el.querySelector('h1')
@@ -97,7 +97,7 @@ describe('mw-page-header', () => {
    */
   it('carries the gap below the heading itself, so no screen sets its own', () => {
     const { el } = mount(HeaderHost)
-    const header = el.querySelector('mw-page-header') as HTMLElement
+    const header = el.querySelector('tk-page-header') as HTMLElement
     expect(header.className, 'the gap is 16px, the middle of the app scale').toContain('mb-4')
     expect(header.className).toContain('block')
   })
@@ -106,12 +106,12 @@ describe('mw-page-header', () => {
 @Component({
   imports: [Stat],
   template: `
-    <mw-stat label="Pending" hint="Held until those studies close." data-full>$12.00</mw-stat>
-    <mw-stat label="Today" data-no-hint>3 / 8</mw-stat>`,
+    <tk-stat label="Pending" hint="Held until those studies close." data-full>$12.00</tk-stat>
+    <tk-stat label="Today" data-no-hint>3 / 8</tk-stat>`,
 })
 class StatHost {}
 
-describe('mw-stat', () => {
+describe('tk-stat', () => {
   it('draws label, projected value and hint, and omits the hint when there is none', () => {
     const { el } = mount(StatHost)
     const full = flat(el.querySelector('[data-full]'))
@@ -128,28 +128,28 @@ describe('mw-stat', () => {
   })
 
   /**
-   * The panel comes from `mw-card` rather than from a copy of its class string. If
+   * The panel comes from `tk-card` rather than from a copy of its class string. If
    * that composition breaks, a tile keeps its text and silently loses its edge —
    * which is invisible to every other test here.
    */
-  it('gets its panel from mw-card rather than from a copy of it', () => {
+  it('gets its panel from tk-card rather than from a copy of it', () => {
     const { el } = mount(StatHost)
-    const panel = el.querySelector('[data-full] [mw-card]') as HTMLElement
-    expect(panel, 'mw-stat must compose mw-card').not.toBeNull()
+    const panel = el.querySelector('[data-full] [tk-card]') as HTMLElement
+    expect(panel, 'tk-stat must compose tk-card').not.toBeNull()
     expect(panel.className).toContain('rounded-card')
   })
 })
 
 @Component({
   imports: [Empty],
-  template: `<mw-empty says="No answers yet."><button data-fix>Answer one</button></mw-empty>`,
+  template: `<tk-empty says="No answers yet."><button data-fix>Answer one</button></tk-empty>`,
 })
 class EmptyHost {}
 
-describe('mw-empty', () => {
+describe('tk-empty', () => {
   it('says its sentence and projects the action that would fill it', () => {
     const { el } = mount(EmptyHost)
-    expect(flat(el.querySelector('mw-empty'))).toContain('No answers yet.')
+    expect(flat(el.querySelector('tk-empty'))).toContain('No answers yet.')
     expect(el.querySelector('[data-fix]')).not.toBeNull()
   })
 
@@ -157,23 +157,23 @@ describe('mw-empty', () => {
   // them. If this stops carrying the space, every caller silently loses it.
   it('carries its own vertical space', () => {
     const { el } = mount(EmptyHost)
-    expect((el.querySelector('mw-empty') as HTMLElement).className).toMatch(/\bpy-\d/)
+    expect((el.querySelector('tk-empty') as HTMLElement).className).toMatch(/\bpy-\d/)
   })
 })
 
 @Component({
   imports: [Async],
   template: `
-    <mw-async
+    <tk-async
       [failed]="failed()"
       [loading]="loading()"
       [empty]="empty()"
       failedSays="Couldn't load your history."
       emptySays="No answers yet."
     >
-      <a mw-empty-action data-invite href="/app/studies/new">Create your first study</a>
+      <a tk-empty-action data-invite href="/app/studies/new">Create your first study</a>
       <p data-rows>two hundred answers</p>
-    </mw-async>`,
+    </tk-async>`,
 })
 class AsyncHost {
   failed = signal(false)
@@ -181,7 +181,7 @@ class AsyncHost {
   empty = signal(false)
 }
 
-describe('mw-async', () => {
+describe('tk-async', () => {
   const rungs = (el: HTMLElement) => ({
     failed: el.querySelector('[data-load-failed]') !== null,
     loading: el.querySelector('[data-loading]') !== null,
@@ -238,7 +238,7 @@ describe('mw-async', () => {
     const banner = el.querySelector('[data-load-failed]') as HTMLElement
     expect(flat(banner)).toContain("Couldn't load your history.")
     // The tone is what makes it read as a failure rather than as a note, and
-    // `mw-banner` carries `role=alert` only for the tones that interrupt.
+    // `tk-banner` carries `role=alert` only for the tones that interrupt.
     expect(banner.getAttribute('role')).toBe('alert')
 
     set(fixture.componentInstance, false, false, true)
@@ -267,14 +267,14 @@ describe('mw-async', () => {
 @Component({
   imports: [Rows, Figure],
   template: `
-    <table mw-rows>
-      <thead><tr><th>When</th><th mw-figure>Amount</th></tr></thead>
-      <tbody><tr><td>today</td><td mw-figure>$1.00</td></tr></tbody>
+    <table tk-rows>
+      <thead><tr><th>When</th><th tk-figure>Amount</th></tr></thead>
+      <tbody><tr><td>today</td><td tk-figure>$1.00</td></tr></tbody>
     </table>`,
 })
 class RowsHost {}
 
-describe('mw-rows', () => {
+describe('tk-rows', () => {
   /**
    * The reason it is a directive and not a component taking column definitions:
    * seven existing specs in this package query `tbody tr`, `thead th` and
@@ -293,26 +293,26 @@ describe('mw-rows', () => {
     const { el } = mount(RowsHost)
     // Both, deliberately: a right-aligned column under a left-aligned head reads as
     // a mistake, and it is the half of this that is easy to forget.
-    for (const cell of el.querySelectorAll('[mw-figure]')) {
+    for (const cell of el.querySelectorAll('[tk-figure]')) {
       expect(cell.className, `${cell.tagName} carries the figure treatment`).toContain('text-right')
       expect(cell.className).toContain('tabular-nums')
     }
-    expect(el.querySelectorAll('[mw-figure]')).toHaveLength(2)
+    expect(el.querySelectorAll('[tk-figure]')).toHaveLength(2)
   })
 
   /**
-   * The pin for a defect the test above cannot see. `mw-figure` puts a plain
-   * `text-right` on the element; `mw-rows` aligned every head with `[&_th]:text-left`,
+   * The pin for a defect the test above cannot see. `tk-figure` puts a plain
+   * `text-right` on the element; `tk-rows` aligned every head with `[&_th]:text-left`,
    * which is a *descendant* selector and outranks it -- so a figure column's header
    * rendered left-aligned over a right-aligned column, with both classes present and
    * correct. No DOM test here has a stylesheet, so this asserts the shape of the rule
    * instead: the head alignment has to exclude figure cells rather than beat them.
    */
-  it('does not out-rank mw-figure when it aligns the head', () => {
+  it('does not out-rank tk-figure when it aligns the head', () => {
     const host = mount(RowsHost).el.querySelector('table') as HTMLElement
     expect(host.className, 'an unscoped head rule silently wins over the element class')
       .not.toMatch(/\[&_th\]:text-(left|right|center)/)
-    expect(host.className).toContain('[&_th:not([mw-figure])]:text-left')
+    expect(host.className).toContain('[&_th:not([tk-figure])]:text-left')
   })
 })
 
@@ -320,7 +320,7 @@ describe('mw-rows', () => {
   imports: [Chip],
   template: `
     @for (t of tabs; track t) {
-      <button type="button" mw-chip [selected]="on() === t" [disabled]="t === 'banned'" [attr.data-tab]="t">{{ t }}</button>
+      <button type="button" tk-chip [selected]="on() === t" [disabled]="t === 'banned'" [attr.data-tab]="t">{{ t }}</button>
     }`,
 })
 class ChipHost {
@@ -328,7 +328,7 @@ class ChipHost {
   on = signal<string>('flagged')
 }
 
-describe('mw-chip', () => {
+describe('tk-chip', () => {
   /**
    * The defect it retires. Four sites drew this control by hand and **one** set
    * `aria-pressed`; on the other three the selected state was carried by colour
@@ -370,7 +370,7 @@ describe('mw-chip', () => {
 @Component({
   imports: [Identity],
   template: `
-    <mw-identity
+    <tk-identity
       who="buyer@example.com"
       [busy]="busy()"
       [failed]="failed()"
@@ -378,7 +378,7 @@ describe('mw-chip', () => {
       (signOut)="pressed = pressed + 1"
     >
       <span data-extra>credits $4.00</span>
-    </mw-identity>`,
+    </tk-identity>`,
 })
 class IdentityHost {
   busy = signal(false)
@@ -386,12 +386,12 @@ class IdentityHost {
   pressed = 0
 }
 
-describe('mw-identity', () => {
+describe('tk-identity', () => {
   const out = (el: HTMLElement) => el.querySelector('[data-signout]') as HTMLButtonElement
 
   it('names the principal, keeps whatever else the chrome shows, and emits on the way out', () => {
     const { fixture, el } = mount(IdentityHost)
-    expect(flat(el.querySelector('mw-identity'))).toContain('buyer@example.com')
+    expect(flat(el.querySelector('tk-identity'))).toContain('buyer@example.com')
     expect(el.querySelector('[data-extra]'), 'the buyer strip also shows credits').not.toBeNull()
     out(el).click()
     expect(fixture.componentInstance.pressed).toBe(1)
@@ -429,6 +429,6 @@ describe('mw-identity', () => {
   // line's mark, put there by the spec, and this is page chrome.
   it('joins its parts without borrowing the status line mark', () => {
     const { el } = mount(IdentityHost)
-    expect(flat(el.querySelector('mw-identity'))).not.toContain('·')
+    expect(flat(el.querySelector('tk-identity'))).not.toContain('·')
   })
 })

@@ -1,0 +1,7 @@
+@import "tailwindcss";
+@import "../tokens.css";
+@source "../src";
+/* The workshop is not a shipped product, so an explicit theme toggle costs nothing here (the
+   web's +8,005 bytes argument is about its shipped sheet). Same variant as the outreach app. */
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+body { @apply bg-ink-50 text-ink-800 font-sans dark:bg-ink-900 dark:text-ink-100; }

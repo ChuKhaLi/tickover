@@ -40,7 +40,7 @@ const ALWAYS = ['ibm-plex-sans-latin-wght-normal'] as const
  * list.
  *
  * The same run measured the mono faces starting at **1239ms and 1250ms** -- a second
- * after the sans, because `ssr: false` leaves the body as `<mw-root></mw-root>` (R42)
+ * after the sans, because `ssr: false` leaves the body as `<tk-root></tk-root>` (R42)
  * and nothing paints in mono until the route chunk lands at 916ms and Angular
  * renders the hero. So for the first second and a quarter of every cold load, the
  * one object this product is a picture of is drawn in the fallback face. It is set
@@ -125,7 +125,7 @@ function strayPages(publicDir: string, written: readonly string[]): string[] {
     // message about a list it does not belong in. Analog's server context attribute is
     // what makes a document one of its routes (R400): the render writes it onto every
     // mount point, and a static page a person wrote has no reason to carry it. The old
-    // marker, a bare `<mw-root>`, no longer appears in a rendered route at all.
+    // marker, a bare `<tk-root>`, no longer appears in a rendered route at all.
     .filter((f) => readFileSync(f, 'utf8').includes('ng-server-context="ssr-analog"'))
     .map((f) => relative(publicDir, f).split('\\').join('/'))
 }

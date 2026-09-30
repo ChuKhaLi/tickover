@@ -24,14 +24,14 @@ import { Directive } from '@angular/core'
  * the orphan check named the rule: R47 for the eighteenth time on this branch, and
  * the reason both guards exist. The word is not written anywhere in this file.)
  *
- * The class is `RecordList` and the selector is `mw-record`, because `Record` is
+ * The class is `RecordList` and the selector is `tk-record`, because `Record` is
  * TypeScript's own mapped type: a directive of that name shadows it inside every
  * file that imports the directive, and it did -- two pages stopped compiling with
  * "Type Record is not generic", which is the error a reader spends a while on
  * because the name in it looks like the language's.
  */
 @Directive({
-  selector: 'dl[mw-record]',
+  selector: 'dl[tk-record]',
   host: {
     class:
       'grid gap-x-6 gap-y-1 text-small sm:grid-cols-[max-content_1fr] [&_dt]:text-ink-600 dark:[&_dt]:text-ink-400',

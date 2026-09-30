@@ -28,19 +28,10 @@ export const PRICING = {
   BASE_CENTS: 100,
   TARGETING_CENTS: 50,
   DEVELOPER_SHARE: 0.5,
-  AT_COST_FEE_CENTS: 5,
+  AT_COST_FEE_CENTS: 6,
   MIN_RESPONDENTS: 50,
   MAX_RESPONDENTS: 500,
 } as const
-
-/**
- * The credit packs Paddle sells, in integer cents: the minimum study (50 responses at $1), the
- * `/buyers` pitch of 300 developers, and the largest targeted study (500 at $1.50). The public
- * pages name them because Paddle's domain review compares a site's pricing with its catalogue
- * (R417). The server's `PADDLE_PRICE_MAP` is what actually credits a payment, and it has to hold
- * one price for each of these; `docs/setup-paddle.md` says so where the map is written.
- */
-export const CREDIT_PACK_CENTS = [5000, 30000, 75000] as const
 
 export interface StudyQuote {
   priceCents: number

@@ -6,8 +6,8 @@ import { Range } from './input'
 /**
  * The two treatments that six and two screens respectively had written out by hand.
  *
- * Neither adds an idea. `mw-meta` retires three different gaps, two type roles and a
- * middle dot that had grown back; `mw-range` retires the same nine classes typed
+ * Neither adds an idea. `tk-meta` retires three different gaps, two type roles and a
+ * middle dot that had grown back; `tk-range` retires the same nine classes typed
  * twice. Both cost **0 bytes** on the shipped stylesheet, because every class they
  * carry was already in it -- which is the clearest statement of this layer's
  * economics: a primitive that unifies what screens already do is free.
@@ -31,12 +31,12 @@ export const MetaLine: Story = {
   render: () => ({
     template: `
       <div style="display:flex; flex-direction:column; gap:20px; max-width:40rem">
-        <p mw-meta>
+        <p tk-meta>
           <span>Sponsor Raycast</span>
-          <span><mw-money [cents]="100" /> per response</span>
+          <span><tk-money [cents]="100" /> per response</span>
           <span>your first study, at cost</span>
         </p>
-        <p mw-meta>
+        <p tk-meta>
           <span>languages typescript, go</span>
           <span>countries US, GB</span>
           <span>tiers heavy</span>
@@ -60,11 +60,11 @@ export const RangeControl: Story = {
       <div style="display:flex; flex-direction:column; gap:16px; max-width:30rem">
         <label style="display:flex; align-items:center; gap:12px">
           <span style="font-size:14px">Terminal width</span>
-          <input type="range" mw-range min="68" max="120" value="80" class="w-56" />
+          <input type="range" tk-range min="68" max="120" value="80" class="w-56" />
         </label>
         <label style="display:flex; flex-direction:column; gap:8px">
           <span style="font-size:14px">Respondents</span>
-          <input type="range" mw-range min="50" max="500" step="10" value="100" class="w-full" />
+          <input type="range" tk-range min="50" max="500" step="10" value="100" class="w-full" />
         </label>
       </div>`,
   }),

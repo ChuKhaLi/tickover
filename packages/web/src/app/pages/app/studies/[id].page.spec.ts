@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing'
 import { provideHttpClient } from '@angular/common/http'
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing'
 import { provideLocationMocks } from '@angular/common/testing'
-import { ActivatedRoute, provideRouter } from '@angular/router'
+import { ActivatedRoute, Router, provideRouter } from '@angular/router'
 import { BehaviorSubject, of, type Observable } from 'rxjs'
 import { afterEach, describe, it, expect, vi } from 'vitest'
 import { AuthState, buyerGuard } from '../../../lib/auth'
@@ -65,14 +65,15 @@ function fakeInterval(): void {
   vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
 }
 
-function mount(paramMap: Observable<Map<string, string>> = of(params(ID))) {
+function mount(paramMap: Observable<Map<string, string>> = of(params(ID)), queryParamMap: Observable<Map<string, string>> = of(new Map())) {
   TestBed.resetTestingModule()
   TestBed.configureTestingModule({
     providers: [
       provideHttpClient(), provideHttpClientTesting(), provideLocationMocks(), provideRouter([]),
       // `paramMap` is a `Map`, so the page has to read the id with `get('id')` —
-      // the one method `ParamMap` and `Map` share.
-      { provide: ActivatedRoute, useValue: { paramMap } },
+      // the one method `ParamMap` and `Map` share. `queryParamMap` is the same shape,
+      // for the PayPal return (`?paypal=...&token=...`).
+      { provide: ActivatedRoute, useValue: { paramMap, queryParamMap } },
     ],
   })
   const auth = TestBed.inject(AuthState)
@@ -80,7 +81,12 @@ function mount(paramMap: Observable<Map<string, string>> = of(params(ID))) {
   const fixture = TestBed.createComponent(StudyPage)
   fixture.detectChanges()
   const el = fixture.nativeElement as HTMLElement
-  return { fixture, auth, el, http: TestBed.inject(HttpTestingController), text: () => el.textContent ?? '' }
+  return { fixture, auth, el, http: TestBed.inject(HttpTestingController), router: TestBed.inject(Router), text: () => el.textContent ?? '' }
+}
+
+/** `mount()` with the query string PayPal redirects the buyer back with. */
+function mountWithQuery(q: Record<string, string>) {
+  return mount(of(params(ID)), of(new Map(Object.entries(q))))
 }
 
 /** Mounts and answers the opening pair. `r` of `null` is a study that asks for no results. */
@@ -556,17 +562,222 @@ describe('StudyPage', () => {
     expect(m.auth.buyer()?.credit_cents).toBe(100)
   })
 
-  // 402 is the one submit failure the buyer can act on from here, and the amount
-  // comes from the server's body rather than from anything this page worked out.
-  it('says how much credit a refused submit needs, from the server', async () => {
-    const m = await open(study({ state: 'draft' }), null)
+  it('shows the amount due, reference and instructions when submit parks the study', async () => {
+    const m = await open(study({ state: 'draft', respondents_completed: 0, charged_cents: 0, refunded_cents: 0, live_at: null, closed_at: null }), null)
     submitButton(m.el)!.click()
+    m.http.expectOne({ method: 'POST', url: `${STUDY_URL}/submit` }).flush(study({
+      state: 'awaiting_payment', respondents_completed: 0, charged_cents: 0, refunded_cents: 0, live_at: null, closed_at: null,
+      amount_due_cents: 1750, payment_reference: 'TKO-8F0B0F2E', payment_instructions: 'Bank A\nAccount 123',
+    }))
     await settle(m.fixture)
-    m.http.expectOne({ method: 'POST', url: `${STUDY_URL}/submit` }).flush({ error: 'insufficient_credit', required_cents: 12345 }, { status: 402, statusText: 'Payment Required' })
+    const panel = m.el.querySelector('[data-awaiting]')!
+    expect(panel.textContent).toContain('$17.50')
+    expect(panel.textContent).toContain('TKO-8F0B0F2E')
+    // Line breaks survive: the instructions are preformatted text, not collapsed into one line.
+    expect(m.el.querySelector('[data-instructions]')!.textContent).toBe('Bank A\nAccount 123')
+    expect(m.el.querySelector('[data-instructions]')!.tagName).toBe('PRE')
+    expect(m.text()).not.toContain('Buy credits')
+  })
+
+  it('says details come by email when the deployment has none', async () => {
+    const m = await open(study({ state: 'awaiting_payment', respondents_completed: 0, live_at: null, closed_at: null, amount_due_cents: 2750, payment_reference: 'TKO-8F0B0F2E', payment_instructions: null }), null)
+    expect(m.el.querySelector('[data-instructions]')).toBeNull()
+    expect(m.el.querySelector('[data-no-instructions]')!.textContent).toContain('sent to you by email')
+  })
+
+  it('withdraws a waiting study back to a draft', async () => {
+    const m = await open(study({ state: 'awaiting_payment', respondents_completed: 0, live_at: null, closed_at: null, amount_due_cents: 2750, payment_reference: 'TKO-8F0B0F2E' }), null)
+    ;(m.el.querySelector('[data-withdraw]') as HTMLButtonElement).click()
+    m.http.expectOne({ method: 'POST', url: `${STUDY_URL}/withdraw` }).flush(study({ state: 'draft', respondents_completed: 0, live_at: null, closed_at: null }))
     await settle(m.fixture)
-    expect(m.text()).toContain('$123.45')
-    expect(hrefs(m.el)).toContain('/app/credits')
-    expect(submitButton(m.el), 'the buyer cannot retry after topping up').toBeDefined()
+    expect(m.el.querySelector('[data-awaiting]')).toBeNull()
+    expect(submitButton(m.el)).toBeTruthy()
+  })
+
+  it('says so when withdraw fails, and keeps the panel', async () => {
+    const m = await open(study({ state: 'awaiting_payment', respondents_completed: 0, live_at: null, closed_at: null, amount_due_cents: 2750, payment_reference: 'TKO-8F0B0F2E' }), null)
+    ;(m.el.querySelector('[data-withdraw]') as HTMLButtonElement).click()
+    m.http.expectOne({ method: 'POST', url: `${STUDY_URL}/withdraw` }).flush({ error: 'not_awaiting_payment' }, { status: 409, statusText: 'Conflict' })
+    await settle(m.fixture)
+    expect(m.el.querySelector('[data-awaiting]')).toBeTruthy()
+    expect(m.text()).toContain("Couldn't withdraw this study")
+  })
+
+  // ---------------------------------------------------------------------------
+  // Pay with PayPal (R505). The button only where the server offers it, the
+  // order/capture round trip, and the return from PayPal's own redirect.
+  // ---------------------------------------------------------------------------
+  const waitingStudy = (over: Record<string, unknown> = {}) => study({ state: 'awaiting_payment', respondents_completed: 0, charged_cents: 0, refunded_cents: 0, live_at: null, closed_at: null, amount_due_cents: 2750, payment_reference: 'TKO-8F0B0F2E', ...over })
+
+  it('shows Pay with PayPal only when the server offers it', async () => {
+    const on = await open(waitingStudy({ paypal_available: true }), null)
+    expect(on.el.querySelector('[data-paypal]')).toBeTruthy()
+    const off = await open(waitingStudy({ paypal_available: false }), null)
+    expect(off.el.querySelector('[data-paypal]')).toBeNull()
+  })
+
+  it('sends the buyer to PayPal', async () => {
+    const m = await open(waitingStudy({ paypal_available: true }), null)
+    const went: string[] = []
+    m.fixture.componentInstance.go = (url: string) => { went.push(url) }
+    ;(m.el.querySelector('[data-paypal]') as HTMLButtonElement).click()
+    m.http.expectOne({ method: 'POST', url: `${STUDY_URL}/paypal/order` }).flush({ approve_url: 'https://www.sandbox.paypal.com/checkoutnow?token=ORDER-1' })
+    await settle(m.fixture)
+    expect(went).toEqual(['https://www.sandbox.paypal.com/checkoutnow?token=ORDER-1'])
+  })
+
+  it('says so when PayPal cannot be opened, pointing at bank transfer only where it is offered', async () => {
+    const m = await open(waitingStudy({ paypal_available: true, payment_instructions: 'Bank A\nAccount 123' }), null)
+    ;(m.el.querySelector('[data-paypal]') as HTMLButtonElement).click()
+    m.http.expectOne({ method: 'POST', url: `${STUDY_URL}/paypal/order` }).flush({ error: 'paypal_unavailable' }, { status: 502, statusText: 'Bad Gateway' })
+    await settle(m.fixture)
+    expect(m.text()).toContain('PayPal could not be opened. Try again, or pay by bank transfer.')
+
+    const only = await open(waitingStudy({ paypal_available: true, payment_instructions: null }), null)
+    ;(only.el.querySelector('[data-paypal]') as HTMLButtonElement).click()
+    only.http.expectOne({ method: 'POST', url: `${STUDY_URL}/paypal/order` }).flush({ error: 'paypal_unavailable' }, { status: 502, statusText: 'Bad Gateway' })
+    await settle(only.fixture)
+    expect(only.text()).toContain('PayPal could not be opened. Try again in a moment.')
+    expect(only.text()).not.toContain('bank transfer')
+  })
+
+  it('offers only PayPal when the deployment has no bank details', async () => {
+    const m = await open(waitingStudy({ paypal_available: true, payment_instructions: null }), null)
+    const panel = m.el.querySelector('[data-awaiting]')!
+    expect(panel.querySelector('[data-paypal]')).toBeTruthy()
+    expect(panel.textContent).toContain('$27.50')
+    // No bank transfer to put a reference on, and no details coming by email.
+    expect(panel.textContent).not.toContain('bank transfer')
+    expect(panel.textContent).not.toContain('TKO-8F0B0F2E')
+    expect(panel.querySelector('[data-no-instructions]')).toBeNull()
+    expect(panel.querySelector('[data-withdraw]')).toBeTruthy()
+  })
+
+  it('still offers bank transfer beside PayPal when the deployment has details', async () => {
+    const m = await open(waitingStudy({ paypal_available: true, payment_instructions: 'Bank A\nAccount 123' }), null)
+    const panel = m.el.querySelector('[data-awaiting]')!
+    expect(panel.textContent).toContain('Or pay by bank transfer')
+    expect(panel.textContent).toContain('TKO-8F0B0F2E')
+    expect(panel.querySelector('[data-instructions]')!.textContent).toBe('Bank A\nAccount 123')
+  })
+
+  it('captures once on return and shows the study in review', async () => {
+    const m = mountWithQuery({ paypal: 'approved', token: 'ORDER-1' })
+    m.http.expectOne(STUDY_URL).flush(waitingStudy({ paypal_available: true }))
+    await settle(m.fixture)
+    const req = m.http.expectOne({ method: 'POST', url: `${STUDY_URL}/paypal/capture` })
+    expect(req.request.body).toEqual({ order_id: 'ORDER-1' })
+    req.flush(study({ state: 'in_review', respondents_completed: 0, live_at: null, closed_at: null }))
+    await settle(m.fixture)
+    // W1: the same credit refresh `submit` does, now after a successful capture.
+    m.http.expectOne('/api/buyer/me').flush(BUYER)
+    await settle(m.fixture)
+    expect(m.el.querySelector('tk-study-badge')!.textContent).toContain('in review')
+    m.http.expectNone({ method: 'POST', url: `${STUDY_URL}/paypal/capture` })
+  })
+
+  // W1: a capture can bank money as credit instead of submitting anything (a
+  // withdrawn-study race, R507), so the header figure the buyer sees is stale
+  // until the principal is read back -- exactly the reason `submit` already does
+  // this. Removing the refresh call is the mutation: this http.expectOne would
+  // then find nothing to flush and the test would fail on a request that was
+  // never made.
+  it("refreshes the buyer's credit figure after a successful PayPal capture", async () => {
+    const m = mountWithQuery({ paypal: 'approved', token: 'ORDER-1' })
+    m.http.expectOne(STUDY_URL).flush(waitingStudy({ paypal_available: true }))
+    await settle(m.fixture)
+    m.http.expectOne({ method: 'POST', url: `${STUDY_URL}/paypal/capture` }).flush(study({ state: 'in_review', respondents_completed: 0, live_at: null, closed_at: null }))
+    await settle(m.fixture)
+    m.http.expectOne('/api/buyer/me').flush({ ...BUYER, credit_cents: 2750 })
+    await settle(m.fixture)
+    expect(m.auth.buyer()?.credit_cents).toBe(2750)
+  })
+
+  it('tells the buyer to reload when the capture cannot be confirmed yet', async () => {
+    const m = mountWithQuery({ paypal: 'approved', token: 'ORDER-1' })
+    m.http.expectOne(STUDY_URL).flush(waitingStudy({ paypal_available: true }))
+    await settle(m.fixture)
+    m.http.expectOne({ method: 'POST', url: `${STUDY_URL}/paypal/capture` }).flush({ error: 'paypal_unavailable' }, { status: 502, statusText: 'Bad Gateway' })
+    await settle(m.fixture)
+    expect(m.text()).toContain('We could not confirm the PayPal payment yet.')
+  })
+
+  it('says nothing was charged after a cancel', async () => {
+    const m = mountWithQuery({ paypal: 'cancelled' })
+    m.http.expectOne(STUDY_URL).flush(waitingStudy({ paypal_available: true }))
+    await settle(m.fixture)
+    expect(m.text()).toContain('PayPal checkout was cancelled, so nothing was charged.')
+  })
+
+  // Review Focus #2: the return page reloaded (or opened twice) after a successful
+  // capture must show one payment and no error -- which depends on the `?paypal=...`
+  // query actually leaving the address bar once it has been handled.
+  it('clears the paypal query from the URL once the return is handled', async () => {
+    const m = mountWithQuery({ paypal: 'approved', token: 'ORDER-1' })
+    const nav = vi.spyOn(m.router, 'navigate')
+    m.http.expectOne(STUDY_URL).flush(waitingStudy({ paypal_available: true }))
+    await settle(m.fixture)
+    m.http.expectOne({ method: 'POST', url: `${STUDY_URL}/paypal/capture` }).flush(study({ state: 'in_review', respondents_completed: 0, live_at: null, closed_at: null }))
+    await settle(m.fixture)
+    m.http.expectOne('/api/buyer/me').flush(BUYER)
+    await settle(m.fixture)
+    expect(nav).toHaveBeenCalledWith([], { queryParams: {}, replaceUrl: true })
+  })
+
+  // The other half: a study opened the ordinary way, with no PayPal query at all,
+  // must never have its URL rewritten by this mechanism -- only a visit PayPal
+  // actually sent the buyer back from does.
+  it('does not touch the URL on an ordinary visit with no PayPal query', async () => {
+    const m = mount()
+    const nav = vi.spyOn(m.router, 'navigate')
+    m.http.expectOne(STUDY_URL).flush(waitingStudy({ paypal_available: true }))
+    await settle(m.fixture)
+    expect(nav).not.toHaveBeenCalled()
+  })
+
+  // W2: a notice (or failure banner) belongs to the return trip of the study the
+  // buyer just left. Nothing about `open` used to clear either signal, so a
+  // buyer who cancelled or failed a PayPal attempt on one study, then followed a
+  // link to another, carried that banner into a study it says nothing true about.
+  it('clears the PayPal notice and failure banner when the page opens a different study', async () => {
+    const route = new BehaviorSubject(params(ID))
+    const m = mount(route, of(new Map(Object.entries({ paypal: 'cancelled' }))))
+    m.http.expectOne(STUDY_URL).flush(waitingStudy({ paypal_available: true }))
+    await settle(m.fixture)
+    expect(m.text()).toContain('PayPal checkout was cancelled')
+
+    // A failed "Pay with PayPal" click leaves its own banner up too.
+    ;(m.el.querySelector('[data-paypal]') as HTMLButtonElement).click()
+    m.http.expectOne({ method: 'POST', url: `${STUDY_URL}/paypal/order` }).flush({ error: 'paypal_unavailable' }, { status: 502, statusText: 'Bad Gateway' })
+    await settle(m.fixture)
+    expect(m.text()).toContain('PayPal could not be opened')
+
+    route.next(params(OTHER))
+    await settle(m.fixture)
+    m.http.expectOne(OTHER_URL).flush(study({ id: OTHER, state: 'draft', title: 'Second study' }))
+    await settle(m.fixture)
+    expect(m.text(), 'a notice from the study just left survived the navigation').not.toContain('PayPal checkout was cancelled')
+    expect(m.text(), 'a failure banner from the study just left survived the navigation').not.toContain('PayPal could not be opened')
+  })
+
+  // W3: the query is read with `take(1)` rather than an open-ended subscribe, so
+  // an unrelated navigation that clears the query before the study has even
+  // loaded cannot erase the value this visit arrived with. Reverting to a plain
+  // `subscribe` is the mutation: the `query.next(new Map())` below would then run
+  // ahead of the effect, `arrivedFromPayPal` would read false, and the capture
+  // request this test waits for would never be made.
+  it('captures using the query read on arrival, not a later navigation that clears it first', async () => {
+    const query = new BehaviorSubject(new Map(Object.entries({ paypal: 'approved', token: 'ORDER-1' })))
+    const m = mount(of(params(ID)), query)
+    // Something else changes the query string before the study has even loaded.
+    query.next(new Map())
+    m.http.expectOne(STUDY_URL).flush(waitingStudy({ paypal_available: true }))
+    await settle(m.fixture)
+    m.http.expectOne({ method: 'POST', url: `${STUDY_URL}/paypal/capture` }).flush(study({ state: 'in_review', respondents_completed: 0, live_at: null, closed_at: null }))
+    await settle(m.fixture)
+    m.http.expectOne('/api/buyer/me').flush(BUYER)
+    await settle(m.fixture)
+    expect(m.el.querySelector('tk-study-badge')!.textContent).toContain('in review')
   })
 
   // Everything else is a failure the buyer cannot price, and it must not leave the

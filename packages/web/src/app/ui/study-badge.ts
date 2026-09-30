@@ -30,6 +30,11 @@ type State = z.infer<typeof StudyState>
  */
 const CLASSES: Record<State, string> = {
   draft: 'bg-ink-200 text-ink-700 dark:bg-ink-700 dark:text-ink-100',
+  // Same treatment as `in_review`: both are a study waiting on someone else's next
+  // action rather than one of the five lifecycle steps, and neither needs a
+  // utility the stylesheet does not already carry.
+  awaiting_payment:
+    'border border-review-edge bg-review-bg text-review-fg dark:border-review-edge-dark dark:bg-review-bg-dark dark:text-review-edge',
   in_review:
     'border border-review-edge bg-review-bg text-review-fg dark:border-review-edge-dark dark:bg-review-bg-dark dark:text-review-edge',
   live: 'bg-signal-400 text-ink-950',
@@ -41,7 +46,7 @@ const CLASSES: Record<State, string> = {
 }
 
 @Component({
-  selector: 'mw-study-badge',
+  selector: 'tk-study-badge',
   // `rounded-chip` is 3px, not the pill it was: design system 5 gives radius a scale
   // where it grows with how much the element contains, and a chip contains one word.
   //
@@ -92,7 +97,7 @@ const STEP_LABEL: Record<(typeof TRACK)[number], string> = {
 }
 
 @Component({
-  selector: 'mw-state-track',
+  selector: 'tk-state-track',
   template: `
     @if (at() >= 0) {
       <ol class="flex gap-2" [attr.aria-label]="label()">
@@ -111,7 +116,7 @@ export class StateTrack {
   state = input.required<State>()
   steps = TRACK
   name(s: (typeof TRACK)[number]): string { return STEP_LABEL[s] }
-  /** -1 for a state that is not on the track, which is only ever `rejected`. */
+  /** -1 for a state that is not on the track, which is only ever `rejected` or `awaiting_payment`. */
   at = computed(() => TRACK.indexOf(this.state() as (typeof TRACK)[number]))
   label = computed(() => `Study lifecycle: ${STEP_LABEL[TRACK[this.at()]!]}, step ${this.at() + 1} of ${TRACK.length}`)
 }

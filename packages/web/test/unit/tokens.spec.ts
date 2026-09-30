@@ -24,9 +24,10 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, it, expect } from 'vitest'
+import { tokenSource } from './token-source'
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
-const source = readFileSync(resolve(packageRoot, 'src/styles.css'), 'utf8')
+const source = tokenSource()
 
 /**
  * `--color-<name>: #RRGGBB;` optionally followed by the `oklch()` it was generated
@@ -218,7 +219,7 @@ const PAIRS: ReadonlyArray<readonly [string, string, string, number]> = [
   ['dark chip label', 'ink-100', 'ink-700', 4.5],
   ['dark secondary button label', 'ink-100', 'ink-900', 4.5],
   ['dark danger button label', 'white', 'rejected-fg', 4.5],
-  // The light half, added when `mw-bar` migrated and the measurement refused the
+  // The light half, added when `tk-bar` migrated and the measurement refused the
   // obvious answer: `signal-400` on the light track is **1.96**, so the fill is a
   // different step in each theme rather than one colour in both.
   ['quota bar against its track', 'signal-600', 'ink-200', 3.0],
@@ -384,7 +385,7 @@ const COLOUR_PROPS = ['bg', 'text', 'border', 'outline', 'ring', 'divide', 'from
 function paints(cls: string): { prop: string; token: string; dark: boolean; state: string } | undefined {
   // Arbitrary variants come off first. Tailwind writes them `[&_thead]:text-ink-600`,
   // and the pattern below rejects `[`, `&` and `_` -- so all four colour utilities on
-  // `mw-rows`, the data grid every table screen uses, parsed to nothing and the whole
+  // `tk-rows`, the data grid every table screen uses, parsed to nothing and the whole
   // string counted as painting no colour at all. Stripping them leaves the part this
   // is asking about, and keeps `dark:` where the dark check can still see it.
   const bare = cls.replace(/\[[^\]]*\]:/g, '')
@@ -420,7 +421,7 @@ function classRuns(body: string): string[][] {
  *
  * Asked of the artifact, not of the templates, and the reason is the same one that
  * moved the migration ledgers: a source-side version of this question could not see a
- * single-word `class` attribute or a class behind an arbitrary variant, so `mw-rows`
+ * single-word `class` attribute or a class behind an arbitrary variant, so `tk-rows`
  * -- the grid on every table screen -- sat outside it entirely. The sheet has no such
  * blind spots. A token that reaches `:root` is a token a rule references, and a rule
  * that references it is a colour on the page.
@@ -761,7 +762,7 @@ describe('a control edge carries the whole affordance', () => {
  * The one exception, and it is a real one rather than an allowance.
  *
  * `white` is Tailwind's, and this system paints it on purpose -- the payout figure
- * inside `mw-pane`, the fill of a raised card, the label on a filled danger button.
+ * inside `tk-pane`, the fill of a raised card, the label on a filled danger button.
  * `PAIRS` measures it as a literal for exactly that reason. It is named here so that
  * the rule below can be an equality rather than a subtraction with a hole in it.
  */
@@ -822,7 +823,7 @@ describe('no stock utility reaches the stylesheet', () => {
 /**
  * Money in a column is set as data; money in a sentence is not.
  *
- * R325 chose `speech` as `mw-money`'s default and said plainly why that is the weaker
+ * R325 chose `speech` as `tk-money`'s default and said plainly why that is the weaker
  * failure: a bold mono figure mid-sentence is obvious, **a column that does not align
  * is not**. It named this guard as the thing that should exist and did not. Writing it
  * before the 23 screens rather than after is the whole point -- every one of those
@@ -839,7 +840,7 @@ describe('money in a column', () => {
   const wrong: string[] = []
   for (const { rel, body } of shipped) {
     for (const cell of body.match(CELL) ?? []) {
-      if (!cell.includes('<mw-money')) continue
+      if (!cell.includes('<tk-money')) continue
       if (/\bcolspan\b/.test(cell)) continue
       if (!cell.includes('voice="data"')) wrong.push(`${rel}: ${cell.slice(0, 60).replace(/\s+/g, ' ')}`)
     }
@@ -850,7 +851,7 @@ describe('money in a column', () => {
   })
 
   it('is looking at the cells that exist', () => {
-    const cells = shipped.flatMap(({ body }) => (body.match(CELL) ?? []).filter((c) => c.includes('<mw-money')))
+    const cells = shipped.flatMap(({ body }) => (body.match(CELL) ?? []).filter((c) => c.includes('<tk-money')))
     expect(cells.length, 'no money cells found at all, so the check above proved nothing').toBeGreaterThanOrEqual(5)
   })
 })

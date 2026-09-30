@@ -103,7 +103,7 @@ describe('buyer AppLayout', () => {
   })
 
   // One layout, one chrome. Rendering the login page inside the layout is where a
-  // second `<mw-shell>` would show up, and no unit render of either component on
+  // second `<tk-shell>` would show up, and no unit render of either component on
   // its own can see it.
   it('wraps a child route in exactly one header and one footer', async () => {
     TestBed.resetTestingModule()

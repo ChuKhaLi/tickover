@@ -24,7 +24,7 @@ export const routeMeta = { title: `${SITE_NAME} — Sign in` } satisfies RouteMe
          the app rather than a public document, so it takes the app h1 role and the
          heading comes from one place. No backtick in this comment -- one ends the
          template literal, and the compiler then points at the decorator. -->
-    <mw-page-header heading="Sign in" />
+    <tk-page-header heading="Sign in" />
     <!-- "30 minutes" mirrors LOGIN_LINK_MINUTES in the server's
          buyer-auth.controller.ts, which this package cannot import and no contract
          constant carries, so nothing turns red if the server changes it and this
@@ -32,17 +32,17 @@ export const routeMeta = { title: `${SITE_NAME} — Sign in` } satisfies RouteMe
          person can find them; whether the value belongs in the contract is with
          the whole-branch review. -->
     @if (sent()) {
-      <mw-banner tone="done" class="mt-5 max-w-md">Check your email for the sign-in link. It works once and expires in 30 minutes.</mw-banner>
+      <tk-banner tone="done" class="mt-5 max-w-md">Check your email for the sign-in link. It works once and expires in 30 minutes.</tk-banner>
     } @else {
       <p class="mt-2 max-w-[68ch] text-ink-800 dark:text-ink-100">We email you a link. There is no password to lose.</p>
       <form class="mt-6 flex max-w-md flex-col items-start gap-4" (submit)="submit($event, email.value)">
-        <mw-field label="Work email" hint="The address your team already uses. We never sell it on." class="w-full">
-          <input mw-input #email name="email" type="email" required autocomplete="email" placeholder="you@company.com" />
-        </mw-field>
-        <button mw-button type="submit" [disabled]="busy()">Email me a link</button>
+        <tk-field label="Work email" hint="The address your team already uses. We never sell it on." class="w-full">
+          <input tk-input #email name="email" type="email" required autocomplete="email" placeholder="you@company.com" />
+        </tk-field>
+        <button tk-button type="submit" [disabled]="busy()">Email me a link</button>
       </form>
       @if (failed()) {
-        <mw-banner tone="error" class="mt-4 max-w-md">Couldn't send the link. Try again in a minute.</mw-banner>
+        <tk-banner tone="error" class="mt-4 max-w-md">Couldn't send the link. Try again in a minute.</tk-banner>
       }
     }`,
 })
@@ -58,7 +58,7 @@ export default class LoginPage {
    * in that window sends an empty address, and the whole of `@angular/forms`
    * would be pulled into this chunk to no other end.
    *
-   * This is also why `mw-input` is a directive rather than a component that wraps
+   * This is also why `tk-input` is a directive rather than a component that wraps
    * an input: the template reference above has to land on the control itself.
    *
    * The message is the same whether or not the address has an account — the

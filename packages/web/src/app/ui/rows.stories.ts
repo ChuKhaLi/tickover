@@ -12,7 +12,7 @@ import { Figure, Rows } from './rows'
  * `thead th` and `td:nth-child(n)`, so a component would have had to reproduce that
  * structure anyway -- the only thing it could add was a wrapper to break them on.
  *
- * Named `mw-rows`, not `mw-table`: `table` is a Tailwind utility this system has
+ * Named `tk-rows`, not `tk-table`: `table` is a Tailwind utility this system has
  * minted out of English prose twice, and a primitive whose own name is a standing
  * hazard in every file that imports it is not worth matching the document.
  */
@@ -24,7 +24,7 @@ export default meta
 type Story = StoryObj
 
 /**
- * Alignment is per cell, and `mw-figure` goes on the `<th>` as well as the `<td>`.
+ * Alignment is per cell, and `tk-figure` goes on the `<th>` as well as the `<td>`.
  * That is the half that is easy to forget: a right-aligned column under a
  * left-aligned head reads as a mistake rather than as a column.
  *
@@ -40,13 +40,13 @@ export const WithFigures: Story = {
     ] },
     template: `
       <div style="max-width:40rem">
-        <table mw-rows>
-          <thead><tr><th>When</th><th>Sponsor</th><th>Study</th><th mw-figure>Amount</th><th>Status</th></tr></thead>
+        <table tk-rows>
+          <thead><tr><th>When</th><th>Sponsor</th><th>Study</th><th tk-figure>Amount</th><th>Status</th></tr></thead>
           <tbody>
             @for (r of rows; track r.when) {
               <tr>
                 <td>{{ r.when }}</td><td>{{ r.sponsor }}</td><td>{{ r.study }}</td>
-                <td mw-figure><mw-money voice="data" [cents]="r.cents" /></td>
+                <td tk-figure><tk-money voice="data" [cents]="r.cents" /></td>
                 <td>{{ r.status }}</td>
               </tr>
             }
@@ -69,13 +69,13 @@ export const Empties: Story = {
   render: () => ({
     template: `
       <div style="display:flex; flex-direction:column; gap:28px; max-width:40rem">
-        <table mw-rows>
-          <thead><tr><th>Study</th><th>State</th><th mw-figure>Responses</th></tr></thead>
+        <table tk-rows>
+          <thead><tr><th>Study</th><th>State</th><th tk-figure>Responses</th></tr></thead>
           <tbody>
-            <tr><td colspan="3"><mw-empty says="No studies yet. Your first one runs at cost."><button mw-button size="sm">Create a study</button></mw-empty></td></tr>
+            <tr><td colspan="3"><tk-empty says="No studies yet. Your first one runs at cost."><button tk-button size="sm">Create a study</button></tk-empty></td></tr>
           </tbody>
         </table>
-        <mw-empty says="No answers yet. Install the plugin and one will arrive while Claude works." />
+        <tk-empty says="No answers yet. Install the plugin and one will arrive while Claude works." />
       </div>`,
   }),
 }

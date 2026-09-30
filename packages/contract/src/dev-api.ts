@@ -14,6 +14,16 @@ export const DeveloperSelf = z.object({
   activity_tier: ActivityTier,
   can_cash_out: z.boolean(),
   payout_method: z.object({ type: z.literal('paypal'), email: z.string().email() }).nullable(),
+  // PayPal could not deliver to payout_method (R515); the next batch skips this developer until
+  // they save it again. Defaults keep an older server's answer parseable (R504).
+  payout_method_needs_confirm: z.boolean().default(false),
+  // Sent by PayPal Payouts and waiting for the developer to claim it at PayPal.
+  unclaimed_cents: z.number().int().default(0),
+  // The address the unclaimed money actually went to -- `payouts.method.email`, fixed on the row at
+  // batch creation -- not `payout_method.email` above, which is whatever the developer has saved
+  // *now* and may have changed since. Null whenever there is nothing unclaimed. Defaults keep an
+  // older server's answer parseable (R504).
+  unclaimed_email: z.string().email().nullable().default(null),
 })
 export type DeveloperSelf = z.infer<typeof DeveloperSelf>
 

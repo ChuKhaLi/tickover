@@ -3,8 +3,8 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http'
 import { firstValueFrom } from 'rxjs'
 import { z, type ZodType } from 'zod'
 import {
-  AggregatesResponse, AudienceEstimate, BuyerSelf, CreditPack, DataSummary, DeveloperSelf, HistoryResponse, PayoutBatchView, StudyResults, StudyView,
-  type AudienceEstimateRequest, type PayoutMethodInput, type StudyInput, type SystemStudyInput,
+  AdminStudyView, AggregatesResponse, AudienceEstimate, BuyerSelf, DataSummary, DeveloperSelf, HistoryResponse, MarkPaidResult, PaymentView, PayoutBatchView, StudyResults, StudyView,
+  type AudienceEstimateRequest, type MarkPaidInput, type PayoutMethodInput, type StudyInput, type SystemStudyInput,
 } from '@tickover/contract'
 
 export class ApiError extends Error {
@@ -38,7 +38,13 @@ const Invariants = z.object({ ok: z.boolean(), problems: z.array(z.string()) })
 export class ApiService {
   private http = inject(HttpClient)
 
-  private async request<T>(method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE', path: string, body: unknown, schema: ZodType<T>, headers?: Record<string, string>): Promise<T> {
+  // `ZodType<T, any, any>`, not the shorter `ZodType<T>`: the shorter form defaults the
+  // Input parameter to Output (`T`), and a schema with a `.default()` field (StudyView's
+  // `amount_due_cents` and friends, R500/R502) has an Input type wider than its Output --
+  // every field the default applies to becomes optional. `T` was then inferred from *that*
+  // shape, not the parsed one, so every caller of a schema with a default silently got an
+  // optional field it could never actually receive undefined for (R504).
+  private async request<T>(method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE', path: string, body: unknown, schema: ZodType<T, any, any>, headers?: Record<string, string>): Promise<T> {
     try {
       const res = await firstValueFrom(this.http.request(method, path, { body, headers, observe: 'response', responseType: 'json' }))
       return schema.parse(res.body ?? undefined)
@@ -48,9 +54,9 @@ export class ApiService {
     }
   }
 
-  get<T>(path: string, schema: ZodType<T>) { return this.request('GET', path, undefined, schema) }
-  post<T>(path: string, body: unknown, schema: ZodType<T>, headers?: Record<string, string>) { return this.request('POST', path, body, schema, headers) }
-  put<T>(path: string, body: unknown, schema: ZodType<T>) { return this.request('PUT', path, body, schema) }
+  get<T>(path: string, schema: ZodType<T, any, any>) { return this.request('GET', path, undefined, schema) }
+  post<T>(path: string, body: unknown, schema: ZodType<T, any, any>, headers?: Record<string, string>) { return this.request('POST', path, body, schema, headers) }
+  put<T>(path: string, body: unknown, schema: ZodType<T, any, any>) { return this.request('PUT', path, body, schema) }
   async delete(path: string): Promise<void> { await this.request('DELETE', path, undefined, z.unknown()) }
 
   buyerMe() { return this.get('/api/buyer/me', BuyerSelf) }
@@ -64,12 +70,15 @@ export class ApiService {
    */
   createStudy(input: StudyInput, idempotencyKey: string) { return this.post('/api/buyer/studies', input, StudyView, { 'Idempotency-Key': idempotencyKey }) }
   submitStudy(id: string) { return this.post(`/api/buyer/studies/${id}/submit`, {}, StudyView) }
+  withdrawStudy(id: string) { return this.post(`/api/buyer/studies/${id}/withdraw`, {}, StudyView) }
+  paypalOrder(id: string) { return this.post(`/api/buyer/studies/${id}/paypal/order`, {}, z.object({ approve_url: z.string().url() })) }
+  paypalCapture(id: string, orderId: string) { return this.post(`/api/buyer/studies/${id}/paypal/capture`, { order_id: orderId }, StudyView) }
   // `AudienceEstimateRequest` reaches the contract's surface as a schema only —
   // it has no companion `export type`. `z.infer<typeof …>` is what the server
   // does with the same schema (`buyer.controller.ts:75`).
   estimate(input: z.infer<typeof AudienceEstimateRequest>) { return this.post('/api/buyer/studies/estimate', input, AudienceEstimate) }
   results(id: string) { return this.get(`/api/buyer/studies/${id}/results`, StudyResults) }
-  creditPacks() { return this.get('/api/buyer/credits/packs', z.array(CreditPack)) }
+  payments() { return this.get('/api/buyer/payments', z.array(PaymentView)) }
   async requestBuyerLink(email: string): Promise<void> { await this.post('/api/buyer/auth/request', { email }, Ok) }
   async buyerLogout(): Promise<void> { await this.post('/api/buyer/auth/logout', {}, Ok) }
   updateBuyer(org: string) { return this.request('PATCH', '/api/buyer/me', { org }, BuyerSelf) }
@@ -90,9 +99,10 @@ export class ApiService {
   // that reports it.
   async adminMe(): Promise<void> { await this.get('/api/admin/me', Ok) }
   async adminLogout(): Promise<void> { await this.post('/api/admin/auth/logout', {}, Ok) }
-  adminStudies(state?: string) { return this.get(`/api/admin/studies${state ? `?state=${state}` : ''}`, z.array(StudyView)) }
+  adminStudies(state?: string) { return this.get(`/api/admin/studies${state ? `?state=${state}` : ''}`, z.array(AdminStudyView)) }
   adminReview(id: string, decision: 'approve' | 'reject', note?: string) { return this.post(`/api/admin/studies/${id}/review`, { decision, note }, StudyView) }
   adminClose(id: string) { return this.post(`/api/admin/studies/${id}/close`, {}, StudyView) }
+  adminMarkPaid(id: string, body: MarkPaidInput) { return this.post(`/api/admin/studies/${id}/mark-paid`, body, MarkPaidResult) }
   adminSystemStudies() { return this.get('/api/admin/system-studies', z.array(StudyView)) }
   adminCreateSystemStudy(input: SystemStudyInput) { return this.post('/api/admin/system-studies', input, StudyView) }
   adminDevelopers(status: 'active' | 'flagged' | 'banned') { return this.get(`/api/admin/developers?status=${status}`, z.array(AdminDeveloper)) }
@@ -108,6 +118,8 @@ export class ApiService {
   adminCreateBatch() { return this.post('/api/admin/payouts/batches', {}, PayoutBatchView) }
   adminBatchPaid(id: string) { return this.post(`/api/admin/payouts/batches/${id}/paid`, {}, PayoutBatchView) }
   adminBatchFailed(id: string) { return this.post(`/api/admin/payouts/batches/${id}/failed`, {}, PayoutBatchView) }
+  adminBatchSend(id: string) { return this.post(`/api/admin/payouts/batches/${id}/send`, {}, PayoutBatchView) }
+  adminBatchRefresh(id: string) { return this.post(`/api/admin/payouts/batches/${id}/refresh`, {}, PayoutBatchView) }
   adminInvariants() { return this.get('/api/admin/invariants', Invariants) }
 
   publicAggregates() { return this.get('/api/public/aggregates', AggregatesResponse) }

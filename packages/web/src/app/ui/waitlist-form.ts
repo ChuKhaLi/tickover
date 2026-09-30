@@ -20,15 +20,15 @@ export const WAITLIST_FETCH = new InjectionToken<typeof fetch>('waitlist.fetch',
 })
 
 @Component({
-  selector: 'mw-waitlist-form',
+  selector: 'tk-waitlist-form',
   imports: [FormsModule, Banner, Button, Field, Input],
   template: `
     @if (state() === 'ok') {
-      <mw-banner tone="done">You're on the list. We'll email you when it opens.</mw-banner>
+      <tk-banner tone="done">You're on the list. We'll email you when it opens.</tk-banner>
     } @else {
       <!-- Stacked rather than one row, and the label is why. This was a
            placeholder-only control -- one of the eleven design system 8 counts, and
-           the reason mw-field exists: once someone has typed, a placeholder is gone
+           the reason tk-field exists: once someone has typed, a placeholder is gone
            and the control has no accessible name at all. A label people can read,
            sitting above the control, is what a form on a public page should have --
            and a label above an input no longer lines up with a button beside it.
@@ -49,12 +49,12 @@ export const WAITLIST_FETCH = new InjectionToken<typeof fetch>('waitlist.fetch',
            alone. -->
 
       <form method="dialog" class="flex max-w-sm flex-col gap-3" (ngSubmit)="submit()">
-        <mw-field label="Email" [error]="state() === 'invalid' ? invalidSays : ''">
-          <input mw-input name="email" type="email" required autocomplete="email" [(ngModel)]="email" placeholder="you@company.com" />
-        </mw-field>
-        <button type="submit" mw-button class="self-start" [disabled]="state() === 'sending'">Join the waitlist</button>
+        <tk-field label="Email" [error]="state() === 'invalid' ? invalidSays : ''">
+          <input tk-input name="email" type="email" required autocomplete="email" [(ngModel)]="email" placeholder="you@company.com" />
+        </tk-field>
+        <button type="submit" tk-button class="self-start" [disabled]="state() === 'sending'">Join the waitlist</button>
       </form>
-      @if (state() === 'failed') { <mw-banner class="mt-3 max-w-sm" tone="error">Couldn't send. Email hello&#64;tickover.dev instead.</mw-banner> }
+      @if (state() === 'failed') { <tk-banner class="mt-3 max-w-sm" tone="error">Couldn't send. Email hello&#64;tickover.dev instead.</tk-banner> }
     }`,
 })
 export class WaitlistForm {

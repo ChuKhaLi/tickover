@@ -9,8 +9,8 @@ describe('quoteStudy', () => {
     expect(quoteStudy({ targeted: true, atCost: false })).toEqual({ priceCents: 150, developerCents: 75 })
   })
   it('prices an at-cost first study at developer share plus fee', () => {
-    expect(quoteStudy({ targeted: false, atCost: true })).toEqual({ priceCents: 55, developerCents: 50 })
-    expect(quoteStudy({ targeted: true, atCost: true })).toEqual({ priceCents: 80, developerCents: 75 })
+    expect(quoteStudy({ targeted: false, atCost: true })).toEqual({ priceCents: 56, developerCents: 50 })
+    expect(quoteStudy({ targeted: true, atCost: true })).toEqual({ priceCents: 81, developerCents: 75 })
   })
   it('exposes the spec constants', () => {
     expect(PRICING.MIN_RESPONDENTS).toBe(50)

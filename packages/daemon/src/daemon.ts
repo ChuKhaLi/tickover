@@ -16,8 +16,12 @@ import { IdleWatch } from './idle.js'
 import { TranscriptWatcher } from './transcript-watch.js'
 import { LoginFlow } from './login.js'
 import { composeBand } from './band.js'
+// From package.json rather than a literal: the literal was never bumped, so 0.1.1 shipped reporting
+// 0.1.0 from `tickover version`, `tickover status` and /v1/health. esbuild inlines the JSON into
+// dist/cli.js, so nothing reads package.json at runtime.
+import pkg from '../package.json' with { type: 'json' }
 
-export const VERSION = '0.1.0'
+export const VERSION: string = pkg.version
 export const PORT_RANGE = Array.from({ length: 10 }, (_, i) => 47321 + i)
 
 export interface DaemonOptions {

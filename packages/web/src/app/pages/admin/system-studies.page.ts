@@ -97,14 +97,14 @@ const MAX_QUESTIONS = largestAccepted((n) => ({ kind: 'profile', title: 'A profi
 @Component({
   imports: [FormsModule, DatePipe, Banner, Button, Card, Confirm, Empty, Field, Input, PageHeader],
   template: `
-    <mw-page-header heading="System studies" />
+    <tk-page-header heading="System studies" />
     <!-- Both kinds are created live and shown to developers straight away; the
          admin API has no draft state for them and no way to take one down from
          here. What each kind then does is spelled out on the confirmation, because
          one of them publishes to the open internet and the other reverses money. -->
     <p class="mt-3 max-w-[68ch] text-small text-ink-600 dark:text-ink-400">Tickover is the sponsor and the questions are unpaid on this study's own row. Profile questions are asked at most {{ profilePerDay }} a day per developer and their answer counts are published on the public data page. Attention questions are injected into paid studies as a hidden check.</p>
 
-    <form mw-card pad="lg" class="mt-4 block space-y-4" (ngSubmit)="ask()">
+    <form tk-card pad="lg" class="mt-4 block space-y-4" (ngSubmit)="ask()">
       <!-- Labels, not placeholders. This form authors a question shown to every
            developer on the panel, and a placeholder stops being a name the moment
            the operator types (design system 8, R347). -->
@@ -114,53 +114,53 @@ const MAX_QUESTIONS = largestAccepted((n) => ({ kind: 'profile', title: 'A profi
            internet. R353 gave the select a full-width rule and recorded that the inherited
            rules were inert; that was the rule which was not (R362). -->
       <div class="grid gap-3 sm:grid-cols-[max-content_1fr]">
-        <mw-field label="Kind">
-          <select mw-input size="sm" name="kind" [attr.name]="'kind'" data-kind [(ngModel)]="kind">
+        <tk-field label="Kind">
+          <select tk-input size="sm" name="kind" [attr.name]="'kind'" data-kind [(ngModel)]="kind">
             <option value="profile">profile (unpaid, {{ profilePerDay }}/day, published)</option>
             <option value="attention">attention (hidden check)</option>
           </select>
-        </mw-field>
-        <mw-field label="Title" [hint]="titleMin + ' to ' + titleMax + ' characters'">
-          <input mw-input size="sm" name="title" [attr.name]="'title'" data-title [(ngModel)]="title" [attr.maxlength]="titleMax" />
-        </mw-field>
+        </tk-field>
+        <tk-field label="Title" [hint]="titleMin + ' to ' + titleMax + ' characters'">
+          <input tk-input size="sm" name="title" [attr.name]="'title'" data-title [(ngModel)]="title" [attr.maxlength]="titleMax" />
+        </tk-field>
       </div>
 
       @for (q of questions; track $index; let qi = $index) {
-        <div mw-card pad="md">
-          <mw-field [label]="'Question ' + (qi + 1)" [hint]="'at most ' + textMax + ' characters'">
-            <input mw-input size="sm" [name]="'q' + qi" [attr.name]="'q' + qi" [(ngModel)]="q.text" [attr.maxlength]="textMax" />
-          </mw-field>
+        <div tk-card pad="md">
+          <tk-field [label]="'Question ' + (qi + 1)" [hint]="'at most ' + textMax + ' characters'">
+            <input tk-input size="sm" [name]="'q' + qi" [attr.name]="'q' + qi" [(ngModel)]="q.text" [attr.maxlength]="textMax" />
+          </tk-field>
           @for (o of q.options; track $index; let oi = $index) {
             <!-- The option boxes take an accessible name rather than a shown label:
                  five rows per question, and a label over each would be five headings
                  for one list. Same call as the developers screen made in batch 2. -->
             <div class="mt-2 flex items-center gap-3">
-              <input mw-input size="sm" [name]="'q' + qi + 'o' + oi" [attr.name]="'q' + qi + 'o' + oi" [attr.aria-label]="'Option ' + (oi + 1) + ' of question ' + (qi + 1)" [(ngModel)]="q.options[oi]" [attr.maxlength]="optionMax" placeholder="option" />
+              <input tk-input size="sm" [name]="'q' + qi + 'o' + oi" [attr.name]="'q' + qi + 'o' + oi" [attr.aria-label]="'Option ' + (oi + 1) + ' of question ' + (qi + 1)" [(ngModel)]="q.options[oi]" [attr.maxlength]="optionMax" placeholder="option" />
               @if (kind === 'attention') { <label class="flex shrink-0 items-center gap-1 text-caption"><input type="radio" [name]="'correct' + qi" [attr.name]="'correct' + qi" [attr.data-correct]="qi + '-' + oi" [value]="oi" [(ngModel)]="q.correct" class="accent-signal-600 dark:accent-signal-400" /> correct</label> }
-              @if (q.options.length > minOptions) { <button type="button" mw-button variant="quiet" size="sm" [attr.data-remove-option]="qi + '-' + oi" (click)="removeOption(q, oi)">remove</button> }
+              @if (q.options.length > minOptions) { <button type="button" tk-button variant="quiet" size="sm" [attr.data-remove-option]="qi + '-' + oi" (click)="removeOption(q, oi)">remove</button> }
             </div>
           }
           <!-- The add button sits with the options it adds to, not after the
                context field: with the context field carrying a label of its own it
                read as belonging to that instead. -->
-          @if (q.options.length < maxOptions) { <button type="button" mw-button variant="quiet" size="sm" class="mt-2" [attr.data-add-option]="qi" (click)="q.options.push('')">+ option</button> }
-          <mw-field class="mt-3" label="Context (optional)" hint="Shown on rich surfaces only.">
-            <textarea mw-input size="sm" [name]="'c' + qi" [attr.name]="'c' + qi" [(ngModel)]="q.context" [attr.maxlength]="contextMax" rows="2"></textarea>
-          </mw-field>
-          @if (questions.length > 1) { <button type="button" mw-button variant="quiet" size="sm" class="mt-3" [attr.data-remove-question]="qi" (click)="questions.splice(qi, 1)">remove question</button> }
+          @if (q.options.length < maxOptions) { <button type="button" tk-button variant="quiet" size="sm" class="mt-2" [attr.data-add-option]="qi" (click)="q.options.push('')">+ option</button> }
+          <tk-field class="mt-3" label="Context (optional)" hint="Shown on rich surfaces only.">
+            <textarea tk-input size="sm" [name]="'c' + qi" [attr.name]="'c' + qi" [(ngModel)]="q.context" [attr.maxlength]="contextMax" rows="2"></textarea>
+          </tk-field>
+          @if (questions.length > 1) { <button type="button" tk-button variant="quiet" size="sm" class="mt-3" [attr.data-remove-question]="qi" (click)="questions.splice(qi, 1)">remove question</button> }
         </div>
       }
 
       <div class="flex flex-wrap items-center gap-3">
-        @if (questions.length < maxQuestions) { <button type="button" mw-button variant="quiet" size="sm" (click)="questions.push(blankQuestion())">+ question</button> }
-        <button type="submit" data-create mw-button size="sm" class="ml-auto" [disabled]="busy()">Create</button>
+        @if (questions.length < maxQuestions) { <button type="button" tk-button variant="quiet" size="sm" (click)="questions.push(blankQuestion())">+ question</button> }
+        <button type="submit" data-create tk-button size="sm" class="ml-auto" [disabled]="busy()">Create</button>
       </div>
       @if (issues().length) { <ul data-issues class="list-disc pl-5 text-small text-rejected-fg dark:text-rejected-edge">@for (i of issues(); track i) { <li>{{ i }}</li> }</ul> }
-      @if (actionFailed(); as why) { <mw-banner data-failed tone="error">{{ why }}</mw-banner> }
+      @if (actionFailed(); as why) { <tk-banner data-failed tone="error">{{ why }}</tk-banner> }
     </form>
 
     @if (armed()) {
-      <mw-confirm heading="Create this {{ kind }} study: it goes live to developers now." action="Create and go live" variant="primary" [busy]="busy()" (go)="create()" (cancel)="disarm()">
+      <tk-confirm heading="Create this {{ kind }} study: it goes live to developers now." action="Create and go live" variant="primary" [busy]="busy()" (go)="create()" (cancel)="disarm()">
         <ul class="mt-1 list-disc space-y-1 pl-5">
           <li>It is created live, not as a draft. Developers start being asked it immediately and this page has no way to take it down.</li>
           @if (kind === 'profile') {
@@ -171,15 +171,15 @@ const MAX_QUESTIONS = largestAccepted((n) => ({ kind: 'profile', title: 'A profi
             <li>So a question with the wrong correct option marked costs real developers real money. Check the marked option before creating it.</li>
           }
         </ul>
-      </mw-confirm>
+      </tk-confirm>
     }
 
     <h2 class="mt-10 text-h2 text-ink-900 dark:text-ink-50">Existing</h2>
-    @if (loadFailed()) { <mw-banner data-load-failed class="mt-2" tone="error">Could not load the existing system studies, so this list may be incomplete. A question you are about to add may already be live.</mw-banner> }
+    @if (loadFailed()) { <tk-banner data-load-failed class="mt-2" tone="error">Could not load the existing system studies, so this list may be incomplete. A question you are about to add may already be live.</tk-banner> }
     @for (s of list(); track s.id) {
       <!-- The meta run is spaced rather than joined by middle dots; design system 7
            keeps that mark for the status line. -->
-      <div mw-card pad="md" class="mt-2 text-small">
+      <div tk-card pad="md" class="mt-2 text-small">
         <p class="flex flex-wrap gap-x-4 gap-y-1">
           <span class="font-medium">{{ s.kind }}</span>
           <span>{{ s.title }}</span>
@@ -194,7 +194,7 @@ const MAX_QUESTIONS = largestAccepted((n) => ({ kind: 'profile', title: 'A profi
            component's own comment tells a caller not to do. No backtick in here: one
            ends the template literal, for the fifth time on this branch. -->
       @if (loading()) { <p data-loading class="py-3 text-small text-ink-600 dark:text-ink-400">Loading…</p> }
-      @else if (!loadFailed()) { <mw-empty says="No system studies yet." /> }
+      @else if (!loadFailed()) { <tk-empty says="No system studies yet." /> }
     }`,
 })
 export default class SystemStudiesPage {

@@ -1,4 +1,4 @@
-// `mw-pane`, and the one assertion the component exists for.
+// `tk-pane`, and the one assertion the component exists for.
 //
 // The pane is the product. Everything else on the landing page is an argument for
 // looking at it. So the defect worth testing is not that it renders -- that is
@@ -9,6 +9,9 @@ import { TestBed } from '@angular/core/testing'
 import { describe, it, expect } from 'vitest'
 import { COLS_MAX, COLS_MIN, RULES, formatStatusLine, resolveColumns } from '@tickover/contract'
 import { Pane } from './pane'
+import { readFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 function mount<T>(type: Type<T>) {
   TestBed.resetTestingModule()
@@ -20,7 +23,7 @@ function mount<T>(type: Type<T>) {
 @Component({
   imports: [Pane],
   template: `
-    <mw-pane
+    <tk-pane
       [cols]="cols()"
       [sponsor]="sponsor()"
       [payoutCents]="50"
@@ -46,10 +49,10 @@ class PaneHost {
 @Component({
   imports: [Pane],
   template: `
-    <mw-pane [cols]="120" sponsor="Acme Analytics" [payoutCents]="50" question="Which database?" [options]="['Postgres']" scene="A terminal. " [todayPaid]="3" [pendingCents]="250" [availableCents]="1000">
+    <tk-pane [cols]="120" sponsor="Acme Analytics" [payoutCents]="50" question="Which database?" [options]="['Postgres']" scene="A terminal. " [todayPaid]="3" [pendingCents]="250" [availableCents]="1000">
       <div class="text-ink-400"><p>~/projects/acme &#183; tickover</p></div>
       <div class="text-white">a prompt someone typed &#183; $9.99</div>
-    </mw-pane>`,
+    </tk-pane>`,
 })
 class SessionHost {}
 
@@ -63,7 +66,7 @@ const surface = (el: HTMLElement) => el.querySelector('[style]') as HTMLElement
 const row = (el: HTMLElement) => surface(el).querySelector('[data-line]') as HTMLElement
 const shown = (el: HTMLElement) => row(el).textContent ?? ''
 
-describe('mw-pane', () => {
+describe('tk-pane', () => {
   /**
    * The assertion the whole component exists for, and the one it shipped without.
    *
@@ -129,7 +132,9 @@ describe('mw-pane', () => {
     const floor = widths.find((c) => at(c).includes('Acme Analytics'))!
 
     expect(at(floor - 1), 'a paid question is offered at a width the client shows nothing at').not.toContain('Acme Analytics')
-    expect(at(floor - 1)).toContain('today')
+    // Below the floor the client says a question is waiting, without its sponsor or text
+    // (it showed the idle line until 2026-09-29, which told a narrow terminal nothing).
+    expect(at(floor - 1)).toContain('question waiting')
     expect(at(floor)).toContain('Acme Analytics')
     // The floor is a fact about the composer, not about this component: it has to be
     // the width at which the *client* starts showing the question.
@@ -236,7 +241,7 @@ describe('mw-pane', () => {
    */
   it('describes itself in prose rather than reading out the punctuation', () => {
     const { el } = mount(PaneHost)
-    const host = el.querySelector('mw-pane') as HTMLElement
+    const host = el.querySelector('tk-pane') as HTMLElement
     expect(host.getAttribute('role')).toBe('img')
     const label = host.getAttribute('aria-label') ?? ''
     expect(label).toContain('120 columns')
@@ -283,7 +288,7 @@ describe('mw-pane', () => {
     ).toEqual(['$0.50'])
     expect(surface(el).textContent, 'the session is on the surface all the same').toContain('a prompt someone typed')
     // role=img replaces the subtree, so the label has to name the whole picture.
-    const label = (el.querySelector('mw-pane') as HTMLElement).getAttribute('aria-label') ?? ''
+    const label = (el.querySelector('tk-pane') as HTMLElement).getAttribute('aria-label') ?? ''
     expect(label.startsWith('A terminal. '), 'the scene prose leads the label').toBe(true)
     expect(label).toContain('120 columns')
   })
@@ -300,7 +305,7 @@ describe('mw-pane', () => {
     // On the row, which is what must not wrap. The surface around it may hold a
     // session, and a terminal wraps that the way any terminal does.
     expect(row(el).className, 'and never wraps').toContain('whitespace-pre')
-    expect((el.querySelector('mw-pane > div') as HTMLElement).className).toContain('overflow-x-auto')
+    expect((el.querySelector('tk-pane > div') as HTMLElement).className).toContain('overflow-x-auto')
   })
 
   /**
@@ -325,7 +330,7 @@ describe('mw-pane', () => {
     const at = (cols: number) => {
       host.fixture.componentInstance.cols.set(cols)
       host.fixture.detectChanges()
-      const pane = host.el.querySelector('mw-pane') as HTMLElement
+      const pane = host.el.querySelector('tk-pane') as HTMLElement
       return { em: parseFloat(surface(host.el).style.width), label: pane.getAttribute('aria-label') ?? '' }
     }
 
@@ -348,5 +353,59 @@ describe('mw-pane', () => {
     // only width a screen reader is given, and it said 5000 too.
     expect(at(5000).label).toContain(`${COLS_MAX} columns`)
     expect(at(1).label).toContain(`${COLS_MIN} columns`)
+  })
+})
+
+@Component({
+  imports: [Pane],
+  template: `
+    <tk-pane [cols]="120" sponsor="Acme Analytics" [payoutCents]="50" question=""
+      [answeredCents]="answered()" [flash]="flash()" [todayPaid]="4" [pendingCents]="300" [availableCents]="1000" />`,
+})
+class FlashHost {
+  flash = signal<'none' | 'row' | 'money'>('none')
+  answered = signal<number | null>(50)
+}
+
+describe('tk-pane flash (R384)', () => {
+  it('washes the row, and only the row, when asked', () => {
+    const { fixture, el } = mount(FlashHost)
+    const row = el.querySelector('[data-line]') as HTMLElement
+    expect(row.classList.contains('tk-wash')).toBe(false)
+    fixture.componentInstance.flash.set('row')
+    fixture.detectChanges()
+    expect(row.classList.contains('tk-wash')).toBe(true)
+    expect(el.querySelector('.tk-flash')).toBeNull()
+  })
+
+  it('flashes the money piece when asked, and no other piece', () => {
+    const { fixture, el } = mount(FlashHost)
+    fixture.componentInstance.flash.set('money')
+    fixture.detectChanges()
+    const flashed = [...el.querySelectorAll('.tk-flash')]
+    expect(flashed).toHaveLength(1)
+    expect(flashed[0]!.textContent).toBe('+$0.50')
+  })
+
+  it('never changes the text of the row', () => {
+    const { fixture, el } = mount(FlashHost)
+    const before = shown(el)
+    for (const f of ['row', 'money', 'none'] as const) {
+      fixture.componentInstance.flash.set(f)
+      fixture.detectChanges()
+      expect(shown(el)).toBe(before)
+    }
+  })
+})
+
+// The signature primitive takes its inputs; it does not reach into the one page that happens to
+// animate it (final review M6). `flash`'s own type used to be imported from the landing sequence's
+// data file, so the component every page may render depended on that page's content.
+describe('tk-pane dependencies', () => {
+  it('imports nothing from the landing hero', () => {
+    const source = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), 'pane.ts'), 'utf8')
+    const imports = source.match(/^import .* from '[^']+'/gm) ?? []
+    expect(imports.length, 'no imports found, so this proved nothing').toBeGreaterThan(0)
+    expect(imports.filter((i) => /from '\.\.\/lib\/hero-/.test(i))).toEqual([])
   })
 })

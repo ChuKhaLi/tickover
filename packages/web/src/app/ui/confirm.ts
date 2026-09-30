@@ -13,7 +13,7 @@ import { Button } from './button'
  * obvious enough from the button label to act on unread.
  *
  * The consequences are projected rather than passed in as strings so a page can
- * put a real <mw-money> figure in them -- amounts on this surface come from the
+ * put a real <tk-money> figure in them -- amounts on this surface come from the
  * server response or the contract, never from a number typed into copy.
  *
  * `go` is the only way any of those calls is reached: the pages hold the action
@@ -22,17 +22,17 @@ import { Button } from './button'
  * (Tailwind scans this comment; a word that is a utility name mints one -- R64.)
  */
 @Component({
-  selector: 'mw-confirm',
+  selector: 'tk-confirm',
   imports: [Banner, Button],
   template: `
-    <mw-banner data-confirm tone="warn" class="mt-3">
+    <tk-banner data-confirm tone="warn" class="mt-3">
       <p class="font-medium">{{ heading() }}</p>
       <ng-content />
       <div class="mt-3 flex flex-wrap items-center gap-2">
-        <button type="button" data-go mw-button [variant]="variant()" size="sm" [disabled]="busy()" (click)="go.emit()">{{ action() }}</button>
-        <button type="button" data-cancel mw-button variant="secondary" size="sm" [disabled]="busy()" (click)="cancel.emit()">Cancel</button>
+        <button type="button" data-go tk-button [variant]="variant()" size="sm" [disabled]="busy()" (click)="go.emit()">{{ action() }}</button>
+        <button type="button" data-cancel tk-button variant="secondary" size="sm" [disabled]="busy()" (click)="cancel.emit()">Cancel</button>
       </div>
-    </mw-banner>`,
+    </tk-banner>`,
 })
 export class Confirm {
   heading = input.required<string>()
@@ -51,7 +51,7 @@ export class Confirm {
    *
    * R342 spent the row actions' colour precisely to keep that distinction: it made
    * every row action quiet on the argument that "the destructive treatment belongs to
-   * the button that actually bans, which is inside mw-confirm". That argument is only
+   * the button that actually bans, which is inside tk-confirm". That argument is only
    * true if the button inside tells the truth, and for half the call sites it did not
    * (R360).
    */

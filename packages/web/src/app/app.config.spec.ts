@@ -29,7 +29,7 @@ async function underRealAppConfig(
   buyerMe: () => Promise<unknown>,
   body: (ctx: { router: Router; auth: AuthState; host: HTMLElement; render: () => Promise<void> }) => Promise<void>,
 ) {
-  document.body.appendChild(document.createElement('mw-root'))
+  document.body.appendChild(document.createElement('tk-root'))
   const app = await bootstrapApplication(App, {
     providers: [appConfig.providers, { provide: ApiService, useValue: { buyerMe } }],
   })
@@ -48,10 +48,10 @@ async function underRealAppConfig(
       await appRef.whenStable()
       await new Promise((ok) => setTimeout(ok, 0))
     }
-    await body({ router, auth: app.injector.get(AuthState), host: document.querySelector('mw-root')!, render })
+    await body({ router, auth: app.injector.get(AuthState), host: document.querySelector('tk-root')!, render })
   } finally {
     app.destroy()
-    document.querySelector('mw-root')?.remove()
+    document.querySelector('tk-root')?.remove()
   }
 }
 

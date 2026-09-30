@@ -31,23 +31,23 @@ const UNREACHABLE = "Couldn't reach the server. Nothing was signed in; try again
 @Component({
   imports: [FormsModule, PageHeader, Field, Input, Button, Banner],
   template: `
-    <mw-page-header heading="Operator sign in" />
+    <tk-page-header heading="Operator sign in" />
     <!-- The three boxes were labelled by their placeholders and nothing else, which
          design system 6.5 retires: a placeholder is gone the moment someone types,
          so it cannot be the only label, and on this form the third box is the one a
          person is most likely to be staring at with a phone in their other hand. -->
     <form class="mt-6 flex max-w-sm flex-col gap-4" (ngSubmit)="submit()">
-      <mw-field label="Email">
-        <input mw-input name="email" type="email" autocomplete="username" [(ngModel)]="email" />
-      </mw-field>
-      <mw-field label="Password">
-        <input mw-input name="password" type="password" autocomplete="current-password" [(ngModel)]="password" />
-      </mw-field>
-      <mw-field label="Authenticator code" hint="The six digits from your authenticator app.">
-        <input mw-input name="totp" inputmode="numeric" autocomplete="one-time-code" maxlength="6" [(ngModel)]="totp" />
-      </mw-field>
-      <button type="submit" data-signin mw-button class="self-start" [disabled]="busy()">Sign in</button>
-      @if (error(); as why) { <mw-banner data-error tone="error">{{ why }}</mw-banner> }
+      <tk-field label="Email">
+        <input tk-input name="email" type="email" autocomplete="username" [(ngModel)]="email" />
+      </tk-field>
+      <tk-field label="Password">
+        <input tk-input name="password" type="password" autocomplete="current-password" [(ngModel)]="password" />
+      </tk-field>
+      <tk-field label="Authenticator code" hint="The six digits from your authenticator app.">
+        <input tk-input name="totp" inputmode="numeric" autocomplete="one-time-code" maxlength="6" [(ngModel)]="totp" />
+      </tk-field>
+      <button type="submit" data-signin tk-button class="self-start" [disabled]="busy()">Sign in</button>
+      @if (error(); as why) { <tk-banner data-error tone="error">{{ why }}</tk-banner> }
     </form>`,
 })
 export default class AdminLoginPage {

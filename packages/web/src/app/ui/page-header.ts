@@ -32,14 +32,14 @@ import { Component, input } from '@angular/core'
  * after the action still renders beside the heading.
  */
 @Component({
-  selector: 'mw-page-header',
+  selector: 'tk-page-header',
   template: `
     <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
       <div class="flex items-center gap-3">
         <h1 class="text-h1-app text-ink-900 dark:text-ink-50">{{ heading() }}</h1>
-        <ng-content select="[mw-header-aside]" />
+        <ng-content select="[tk-header-aside]" />
       </div>
-      <ng-content select="[mw-header-action]" />
+      <ng-content select="[tk-header-action]" />
     </div>
   `,
   host: { class: 'mb-4 block' },

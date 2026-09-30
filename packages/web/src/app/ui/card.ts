@@ -42,7 +42,7 @@ const ALWAYS = 'rounded-card border border-ink-200 dark:border-ink-700'
  * here to warn about them is how the round before this one minted one of them twice.
  */
 @Directive({
-  selector: '[mw-card]',
+  selector: '[tk-card]',
   host: { '[class]': 'classes()' },
 })
 export class Card {

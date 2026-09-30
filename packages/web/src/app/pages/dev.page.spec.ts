@@ -20,6 +20,9 @@ const DEV: DeveloperSelf = {
   activity_tier: 'regular',
   can_cash_out: true,
   payout_method: null,
+  payout_method_needs_confirm: false,
+  unclaimed_cents: 0,
+  unclaimed_email: null,
 }
 
 @Component({ template: 'somewhere else' })
@@ -87,7 +90,7 @@ describe('developer DevLayout', () => {
     expect(el.textContent).toContain("Couldn't sign you out")
   })
 
-  // One layout, one chrome. A second `<mw-shell>` on a child page shows up here and
+  // One layout, one chrome. A second `<tk-shell>` on a child page shows up here and
   // nowhere else, because no unit render of either component on its own can see it.
   //
   // The child-route probe is `Available`, a balance-card label, and the word matters.

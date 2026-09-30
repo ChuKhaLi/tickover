@@ -31,7 +31,7 @@ const ALWAYS =
  * reaches the outside of the box.
  *
  * The placeholder is `ink-500`, the token R304 reserved for exactly this -- a mark
- * that is decorative and must never be the only label. `mw-field` supplies the
+ * that is decorative and must never be the only label. `tk-field` supplies the
  * label; this directive never does.
  *
  * A `select` takes the same treatment, and for the same reason the edge exists: it is
@@ -47,15 +47,15 @@ const ALWAYS =
  * the edge it finds, so lightening it goes red instead of quietly shipping.
  */
 @Directive({
-  selector: 'input[mw-input], textarea[mw-input], select[mw-input]',
+  selector: 'input[tk-input], textarea[tk-input], select[tk-input]',
   host: {
     '[class]': 'classes()',
-    '[attr.data-mw-control]': '""',
+    '[attr.data-tk-control]': '""',
   },
 })
 export class Input {
   size = input<InputSize>('md')
-  /** `mw-field` reads this to point its label and its hint at the control. */
+  /** `tk-field` reads this to point its label and its hint at the control. */
   readonly el = inject(ElementRef<HTMLInputElement | HTMLTextAreaElement>)
   classes = () => `${ALWAYS} ${SIZE[this.size()]}`
 }
@@ -71,12 +71,12 @@ export class Input {
  * is never removed, and this product's primary input is a keyboard).
  *
  * Native, not rebuilt: the keyboard behaviour, the screen-reader value and the touch
- * target are the platform's, which is the same reasoning `mw-input` records. Width is
+ * target are the platform's, which is the same reasoning `tk-input` records. Width is
  * the caller's -- one is `w-56` beside a label, the other `w-full` under one -- and
  * width is a layout decision rather than a treatment.
  */
 @Directive({
-  selector: 'input[type=range][mw-range]',
+  selector: 'input[type=range][tk-range]',
   host: {
     class:
       'h-2 cursor-pointer accent-signal-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal-600 dark:accent-signal-400 dark:focus-visible:outline-signal-400',

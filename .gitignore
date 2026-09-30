@@ -37,3 +37,6 @@ lighthouse-results/
 # this is where the worktree tooling actually puts them. Anchored to the repo root by the slash in
 # the middle, the same rule the `**/.claude/types/` note above records.
 .claude/worktrees/
+
+# Outreach redesign screenshots contain real prospect names (2026-09-29-tickover-ui)
+docs/superpowers/reports/2026-09-29-tickover-ui/*.png

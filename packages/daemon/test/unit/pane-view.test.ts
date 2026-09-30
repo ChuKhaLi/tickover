@@ -19,8 +19,15 @@ describe('renderPane', () => {
       '  1  Postgres, faster',
       '  2  Cached DB',
       '─'.repeat(60),
-      '1-5 answer · 0 skip · q quit',
+      '1-2 answer · 0 skip · q quit',
     ])
+  })
+  // Captured 2026-09-29: the footer said 1-5 under a two-option question, and offered keys to
+  // answer and skip while there was no question at all.
+  it('offers only the keys that do something', () => {
+    const three = servedQuestion({ options: ['a', 'b', 'c'] })
+    expect(renderPane({ ...base, view: { ...base.view, question: three } }).split('\n').at(-1)).toBe('1-3 answer · 0 skip · q quit')
+    expect(renderPane(base).split('\n').at(-1)).toBe('q quit')
   })
   it('renders waiting, logged out, and answered states', () => {
     expect(renderPane(base)).toContain('Waiting for the next question…')

@@ -36,7 +36,7 @@ const PROSE = 'p,li,dd,dt'
 /**
  * A row of items is not a run of prose, and the sweep learned this from a real false
  * positive: `/app/studies/<id>` reports "17 valid answers from 18 respondents" beside
- * "CSV export opens when the study settles" in a `p[mw-meta]`, which is
+ * "CSV export opens when the study settles" in a `p[tk-meta]`, which is
  * `flex flex-wrap`. Two short spans, laid out side by side, never forming a line of
  * text — but `textContent` joins them into 155 characters and the element is as wide
  * as its container by design.

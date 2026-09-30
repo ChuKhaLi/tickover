@@ -19,9 +19,11 @@ describe('formatStatusLine', () => {
   it('renders logged out, idle, question, profile, and answered lines', () => {
     expect(formatStatusLine({ ...base, loggedIn: false })).toBe('tickover · run /tickover:setup to start earning')
     expect(formatStatusLine(base)).toBe('tickover · today 3/10 · balance $27.10')
-    expect(formatStatusLine({ ...base, question: q(), maxColumns: 120 })).toBe('tickover · Acme DB · $0.50 · Which tagline? 1 Postgres, but faster  2 Your DB, cached')
+    expect(formatStatusLine({ ...base, question: q(), maxColumns: 120 })).toBe('tickover · Acme DB · $0.50 · Which tagline? 1 Postgres, but faster  2 Your DB, cached · answer: tickover pane')
     expect(formatStatusLine({ ...base, maxColumns: 120, question: q({ kind: 'profile', sponsor: 'Tickover', price_cents: 0, text: 'Which model do you use most?', options: ['Opus', 'Sonnet', 'Other'] }) }))
-      .toBe('tickover · unpaid · panel profile · Which model do you use most? 1 Opus  2 Sonnet  3 Other')
+      .toBe('tickover · unpaid · panel profile · Which model do you use most? 1 Opus  2 Sonnet  3 Other · answer: tickover pane')
+    // Without the room for it, the question and its options come first and the hint is dropped.
+    expect(formatStatusLine({ ...base, question: q(), maxColumns: 90 })).toBe('tickover · Acme DB · $0.50 · Which tagline? 1 Postgres, but faster  2 Your DB, cached')
     expect(formatStatusLine({ ...base, answered: { earnedCents: 50 } })).toBe('tickover · ✓ +$0.50 · today 3/10 · balance $27.10')
   })
 
@@ -176,12 +178,32 @@ describe('formatStatusLine field budgeting', () => {
     expect(stringWidth(line)).toBeLessThanOrEqual(74)
   })
 
-  it('suppresses the question entirely when the disclosure cannot fit', () => {
+  it('says a question is waiting, and where to answer it, when the disclosure cannot fit', () => {
     // Below roughly 44 usable columns there is no room for sponsor + payout + any question text.
-    // Section 4.7's disclosure is unconditional, so the question is dropped rather than the
-    // disclosure degraded — the developer sees the ordinary idle line instead.
-    const line = formatStatusLine({ ...base, maxColumns: 40, question: q() })
-    expect(line).toBe('tickover · today 3/10 · balance $27.10')
+    // Section 4.7's disclosure is unconditional, so the question is not shown rather than the
+    // disclosure degraded. It used to fall back to the ordinary idle line, which told a developer in
+    // a narrow split pane nothing at all: captured 2026-09-29, a real profile question vanished at
+    // 60 columns. Saying that one is waiting names no sponsor and shows no question.
+    // 54: what COLUMNS=60 leaves after the safety margin (resolveColumns).
+    expect(formatStatusLine({ ...base, maxColumns: 54, question: q() })).toBe('tickover · question waiting · answer: tickover pane')
+    expect(formatStatusLine({ ...base, maxColumns: 40, question: q() })).toBe('tickover · question waiting')
+  })
+
+  // At the exact boundary, one column short of room for " · " plus the hint, the hint is left out
+  // rather than added and then clipped by the final truncation (an off-by-one there survived every
+  // other test -- whole-branch review, Minor).
+  it('adds the hint only when all of it fits', () => {
+    const bare = 'tickover · Acme DB · $0.50 · Which tagline? 1 Postgres, but faster  2 Your DB, cached'
+    const room = stringWidth(bare) + stringWidth(' · answer: tickover pane')
+    expect(formatStatusLine({ ...base, maxColumns: room, question: q() })).toBe(`${bare} · answer: tickover pane`)
+    expect(formatStatusLine({ ...base, maxColumns: room - 1, question: q() })).toBe(bare)
+  })
+
+  it('tells a developer how to answer whenever the whole question fits with room to spare', () => {
+    // Captured 2026-09-29: shown its first production question, a developer typed the option
+    // number into Claude Code, which sends it as a prompt. Nothing on the line said otherwise.
+    const line = formatStatusLine({ ...base, maxColumns: 200, question: q() })
+    expect(line.endsWith(' · answer: tickover pane')).toBe(true)
   })
 })
 
@@ -226,8 +248,10 @@ describe('formatStatusLine invariants', () => {
       // 1. The budget is never exceeded. This is the promise the whole module exists to keep.
       expect(stringWidth(line), where).toBeLessThanOrEqual(cap)
 
-      const idle = 'tickover · today 3/10 · balance $27.10'
-      if (line === truncateToWidth(idle, cap)) { sawIdle++; continue }
+      // The line that stands in for a question too narrow to disclose: no sponsor, no question.
+      // At the narrowest caps it is itself cut by the final truncation.
+      const waiting = ['tickover · question waiting · answer: tickover pane', 'tickover · question waiting'].map((w) => truncateToWidth(w, cap))
+      if (waiting.includes(line)) { sawIdle++; continue }
       if (line.includes('press 1-')) {
         // 2. The count fallback must state the true number of options, or it misinforms.
         sawHint++

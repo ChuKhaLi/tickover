@@ -8,6 +8,7 @@ import { adminGuard } from '../../lib/auth'
 
 const IN_REVIEW = '/api/admin/studies?state=in_review'
 const LIVE = '/api/admin/studies?state=live'
+const AWAITING = '/api/admin/studies?state=awaiting_payment'
 const ONE = '8f0b0f2e-6f6a-4a3a-9c1f-0f1e2d3c4b5a'
 const TWO = '22222222-2222-4222-8222-222222222222'
 
@@ -31,12 +32,13 @@ const drain = () => new Promise((ok) => setTimeout(ok, 0))
 const squish = (s: string | null) => (s ?? '').replace(/\s+/g, ' ').trim()
 
 /**
- * Renders the page and answers its two opening requests. Note what is *not* here:
- * `<mw-shell>`. Twice on this branch a page test asserted on a string the layout
+ * Renders the page and answers its three opening requests (in_review, live,
+ * awaiting_payment — Task 10 adds the third). Note what is *not* here:
+ * `<tk-shell>`. Twice on this branch a page test asserted on a string the layout
  * supplied, so the page could render nothing and stay green. Everything below is
  * asserted against a bare page, so only the page can have produced it.
  */
-async function mount(queue: unknown[] | { status: number } = [study({})], live: unknown[] = []) {
+async function mount(queue: unknown[] | { status: number } = [study({})], live: unknown[] = [], awaiting: unknown[] = []) {
   TestBed.resetTestingModule()
   TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])] })
   const fixture = TestBed.createComponent(ReviewPage)
@@ -44,9 +46,11 @@ async function mount(queue: unknown[] | { status: number } = [study({})], live: 
   const http = TestBed.inject(HttpTestingController)
   const q = http.expectOne(IN_REVIEW)
   const l = http.expectOne(LIVE)
-  if (Array.isArray(queue)) { q.flush(queue); l.flush(live) } else {
+  const w = http.expectOne(AWAITING)
+  if (Array.isArray(queue)) { q.flush(queue); l.flush(live); w.flush(awaiting) } else {
     q.flush({ error: 'internal' }, { status: queue.status, statusText: 'Server Error' })
     l.flush({ error: 'internal' }, { status: queue.status, statusText: 'Server Error' })
+    w.flush({ error: 'internal' }, { status: queue.status, statusText: 'Server Error' })
   }
   await settle(fixture)
   const el = fixture.nativeElement as HTMLElement
@@ -62,11 +66,25 @@ async function mount(queue: unknown[] | { status: number } = [study({})], live: 
     /** The confirmation panel's text, and only its text. */
     panel: () => squish((el.querySelector('[data-confirm]') as HTMLElement | null)?.textContent ?? null),
     /** Answers the refresh both decisions trigger. */
-    reload: (nextQueue: unknown[], nextLive: unknown[]) => {
+    reload: (nextQueue: unknown[], nextLive: unknown[], nextAwaiting: unknown[] = []) => {
       http.expectOne(IN_REVIEW).flush(nextQueue)
       http.expectOne(LIVE).flush(nextLive)
+      http.expectOne(AWAITING).flush(nextAwaiting)
     },
   }
+}
+
+/**
+ * The refresh `markPaid` reissues after every outcome (Task 10): all three lists
+ * come back empty, since none of the tests that use this care what the queue and
+ * live lists hold afterwards -- only the notice `markPaid` set is being asserted.
+ */
+async function answerRefresh(m: Awaited<ReturnType<typeof mount>>): Promise<void> {
+  await drain() // the reload is issued from inside the flushed response's own promise chain
+  m.http.expectOne(IN_REVIEW).flush([])
+  m.http.expectOne(LIVE).flush([])
+  m.http.expectOne(AWAITING).flush([])
+  await settle(m.fixture)
 }
 
 describe('admin ReviewPage', () => {
@@ -346,5 +364,118 @@ describe('admin ReviewPage', () => {
     const said = squish(m.el.querySelector('[data-failed]')?.textContent ?? null)
     expect(said).toContain('already closed and settled')
     expect(said).not.toContain('Check whether it settled before trying again')
+  })
+
+  describe('awaiting payment (R503)', () => {
+    const WAITING = {
+      ...study({}), id: '55555555-5555-4555-8555-555555555555', state: 'awaiting_payment',
+      amount_due_cents: 2750, payment_reference: 'TKO-55555555', buyer_email: 'pm@acme.test',
+    }
+
+    it('lists studies awaiting payment with amount, reference and buyer', async () => {
+      const m = await mount([], [], [WAITING])
+      const row = m.el.querySelector(`[data-awaiting-row="${WAITING.id}"]`)!
+      expect(row.textContent).toContain('$27.50')
+      expect(row.textContent).toContain('TKO-55555555')
+      expect(row.textContent).toContain('pm@acme.test')
+    })
+
+    // I-1: the owner has to be able to apply §4.7 to a study before invoicing it, which means
+    // reading the whole thing here rather than following a link — the same requirement the
+    // in_review queue below already meets. Asserted against the row alone (not `m.text()`), the
+    // smallest element that carries the claim.
+    it('shows the whole study on the awaiting row, not just the invoice line', async () => {
+      const m = await mount([], [], [WAITING])
+      const row = m.el.querySelector(`[data-awaiting-row="${WAITING.id}"]`)!
+      expect(row.textContent).toContain('sponsor Acme')
+      expect(row.textContent).toContain('100 respondents')
+      expect(row.textContent).toContain('languages typescript')
+      expect(row.textContent).toContain('Which tagline?')
+      expect(row.textContent).toContain('A | B')
+    })
+
+    it('marks a study paid with the amount prefilled, and reports that it was submitted', async () => {
+      const m = await mount([], [], [WAITING])
+      const ref = m.el.querySelector(`[data-paid-reference="${WAITING.id}"]`) as HTMLInputElement
+      ref.value = 'VCB-9'; ref.dispatchEvent(new Event('input'))
+      await settle(m.fixture)
+      ;(m.el.querySelector(`[data-mark-paid="${WAITING.id}"]`) as HTMLButtonElement).click()
+      const req = m.http.expectOne({ method: 'POST', url: `/api/admin/studies/${WAITING.id}/mark-paid` })
+      expect(req.request.body).toEqual({ cents: 2750, method: 'bank_transfer', reference: 'VCB-9' })
+      req.flush({ study: { ...WAITING, state: 'in_review', amount_due_cents: 0 }, submitted: true, amount_due_cents: 0 })
+      await answerRefresh(m) // the three list requests the page re-issues
+      expect(m.text()).toContain('Payment recorded. The study is now in review.')
+    })
+
+    it('says how much is still due after a short payment', async () => {
+      const m = await mount([], [], [WAITING])
+      const ref = m.el.querySelector(`[data-paid-reference="${WAITING.id}"]`) as HTMLInputElement
+      ref.value = 'W-1'; ref.dispatchEvent(new Event('input'))
+      await settle(m.fixture)
+      ;(m.el.querySelector(`[data-mark-paid="${WAITING.id}"]`) as HTMLButtonElement).click()
+      m.http.expectOne({ method: 'POST', url: `/api/admin/studies/${WAITING.id}/mark-paid` })
+        .flush({ study: { ...WAITING, amount_due_cents: 50 }, submitted: false, amount_due_cents: 50 })
+      await answerRefresh(m)
+      expect(m.text()).toContain('Payment recorded, but $0.50 is still due.')
+    })
+
+    it('explains a transfer that was already recorded', async () => {
+      const m = await mount([], [], [WAITING])
+      const ref = m.el.querySelector(`[data-paid-reference="${WAITING.id}"]`) as HTMLInputElement
+      ref.value = 'W-1'; ref.dispatchEvent(new Event('input'))
+      await settle(m.fixture)
+      ;(m.el.querySelector(`[data-mark-paid="${WAITING.id}"]`) as HTMLButtonElement).click()
+      m.http.expectOne({ method: 'POST', url: `/api/admin/studies/${WAITING.id}/mark-paid` })
+        .flush({ error: 'payment_already_recorded' }, { status: 409, statusText: 'Conflict' })
+      await settle(m.fixture)
+      expect(m.text()).toContain('That payment reference is already recorded')
+    })
+
+    // M-2: a mark-paid that loses to a reject or a withdraw answers 409 too, but with
+    // a different error body than `payment_already_recorded`. Falling through to
+    // STALE[409] told the operator the study was "no longer in review" -- the wording
+    // for the review queue's own 409, not this endpoint's -- about a study that was
+    // never in review at all.
+    it('says the study is no longer awaiting payment on any other mark-paid conflict', async () => {
+      const m = await mount([], [], [WAITING])
+      const ref = m.el.querySelector(`[data-paid-reference="${WAITING.id}"]`) as HTMLInputElement
+      ref.value = 'W-1'; ref.dispatchEvent(new Event('input'))
+      await settle(m.fixture)
+      ;(m.el.querySelector(`[data-mark-paid="${WAITING.id}"]`) as HTMLButtonElement).click()
+      m.http.expectOne({ method: 'POST', url: `/api/admin/studies/${WAITING.id}/mark-paid` })
+        .flush({ error: 'not_awaiting_payment' }, { status: 409, statusText: 'Conflict' })
+      await settle(m.fixture)
+      const said = squish(m.el.querySelector('[data-failed]')?.textContent ?? null)
+      expect(said).toContain('no longer awaiting payment')
+      expect(said, 'nothing was recorded, so the reference message is wrong here').not.toContain('nothing you did')
+      expect(said, 'the review queue\'s own 409 wording leaked into mark-paid').not.toContain('no longer in review')
+    })
+
+    it('disables mark paid until a reference is typed', async () => {
+      const m = await mount([], [], [WAITING])
+      expect((m.el.querySelector(`[data-mark-paid="${WAITING.id}"]`) as HTMLButtonElement).disabled).toBe(true)
+    })
+
+    // M-1: the input is prefilled with cents and "cents" previously lived only in the
+    // aria-label, which a sighted operator typing dollars never reads. The unit has to
+    // be visible text next to the input, not only in the accessible name.
+    it('shows the amount unit visibly next to the mark-paid input', async () => {
+      const m = await mount([], [], [WAITING])
+      const row = m.el.querySelector(`[data-awaiting-row="${WAITING.id}"]`)!
+      expect(row.textContent).toContain('cents')
+    })
+
+    // Task 5 lets a waiting study be refused; the wording is the only thing this
+    // adds, because nothing was ever taken from the buyer to give back.
+    it('says nothing was taken when rejecting a study that is still awaiting payment', async () => {
+      const m = await mount([], [], [WAITING])
+      const note = m.el.querySelector(`[data-note="${WAITING.id}"]`) as HTMLInputElement
+      note.value = 'Wrong buyer'; note.dispatchEvent(new Event('input'))
+      await settle(m.fixture)
+      m.click(`[data-reject="${WAITING.id}"]`)
+      await settle(m.fixture)
+      expect(m.panel()).toContain('No payment was taken, so nothing is refunded.')
+      expect(m.panel()).not.toContain('refunds the buyer')
+    })
   })
 })

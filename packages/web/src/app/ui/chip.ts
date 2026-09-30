@@ -32,11 +32,11 @@ const ALWAYS =
   'inline-flex cursor-pointer items-center rounded-chip px-3 py-1 text-small transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal-600 dark:focus-visible:outline-signal-400'
 
 @Directive({
-  selector: 'button[mw-chip]',
+  selector: 'button[tk-chip]',
   host: {
     '[class]': 'classes()',
     '[attr.aria-pressed]': 'selected()',
-    '[attr.data-mw-control]': '""',
+    '[attr.data-tk-control]': '""',
   },
 })
 export class Chip {

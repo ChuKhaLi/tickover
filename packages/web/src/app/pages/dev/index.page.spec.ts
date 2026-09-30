@@ -19,6 +19,9 @@ const DEV: DeveloperSelf = {
   activity_tier: 'regular',
   can_cash_out: true,
   payout_method: null,
+  payout_method_needs_confirm: false,
+  unclaimed_cents: 0,
+  unclaimed_email: null,
 }
 
 /**
@@ -263,5 +266,39 @@ describe('developer EarningsPage', () => {
     const both = await withHistory({ rows: [], next_cursor: null }, { payout_method: { type: 'paypal', email: 'me@pp.test' }, can_cash_out: false })
     expect(both.text).not.toContain('Set your PayPal email in Settings')
     expect(both.text).toContain(`${RULES.GITHUB_MIN_AGE_MONTHS} months old`)
+  })
+
+  // R515: unclaimed money is a state neither balance above can describe — it left
+  // pending when the study closed, and left available when the run exported, so it
+  // reads zero on both cards unless something says it is sitting at PayPal instead.
+  // Both banners render off `auth.developer()` directly, so the history request
+  // does not need to be flushed to see them.
+  // The address named is `unclaimed_email` -- frozen on the payout row at batch creation -- not
+  // `payout_method.email`, which is whatever the developer has saved since. The fixture below gives
+  // them different values on purpose: a page that read the wrong one would still pass a fixture
+  // where both happened to match.
+  it('tells the developer money is waiting for them at PayPal, naming the address it was sent to', () => {
+    const { el } = mount({ unclaimed_cents: 2500, unclaimed_email: 'old@pp.test', payout_method: { type: 'paypal', email: 'new@pp.test' } })
+    const note = el.querySelector('[data-unclaimed]')
+    expect(note?.textContent).toContain('$25.00')
+    expect(note?.textContent).toContain('old@pp.test')
+    expect(note?.textContent).not.toContain('new@pp.test')
+    expect(note?.textContent).toContain('30 days')
+  })
+
+  // The address itself is what failed, and Settings is the only page that can fix
+  // it, so the notice has to send the developer there.
+  it('tells the developer to confirm a PayPal address that could not be paid, linking to Settings', () => {
+    const { el } = mount({ payout_method_needs_confirm: true, payout_method: { type: 'paypal', email: 'me@pp.test' } })
+    const note = el.querySelector('[data-needs-confirm]')
+    expect(note?.textContent).toContain('could not deliver')
+    expect(note?.querySelector('a')?.getAttribute('href')).toBe('/dev/settings')
+  })
+
+  // Both notices are for a state, not a default: most developers hit neither.
+  it('shows neither notice by default', () => {
+    const { el } = mount()
+    expect(el.querySelector('[data-unclaimed]')).toBeNull()
+    expect(el.querySelector('[data-needs-confirm]')).toBeNull()
   })
 })

@@ -27,7 +27,7 @@ const TONE: Record<BannerTone, string> = {
 const ROLE: Record<BannerTone, 'alert' | 'status'> = { error: 'alert', warn: 'alert', done: 'status', info: 'status' }
 
 @Component({
-  selector: 'mw-banner',
+  selector: 'tk-banner',
   template: `<ng-content />`,
   host: {
     '[class]': 'classes()',

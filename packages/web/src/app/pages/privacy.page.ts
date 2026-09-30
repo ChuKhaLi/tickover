@@ -26,9 +26,9 @@ import { DERIVED_LIST, NEVER_LIST, SENT_LIST } from '../lib/disclosure'
 @Component({
   imports: [Shell, Link],
   template: `
-    <mw-shell [links]="[{ href: '/developers', label: 'For developers' }, { href: '/buyers', label: 'For buyers' }]">
+    <tk-shell [links]="[{ href: '/developers', label: 'For developers' }, { href: '/buyers', label: 'For buyers' }]">
       <h1 class="text-h1-public text-ink-900 dark:text-ink-50">Privacy</h1>
-      <p class="mt-3 max-w-[68ch] text-ink-600 dark:text-ink-400">The same three lists the plugin shows you before it sends anything, plus what happens to them afterwards. Last updated 26 September 2026.</p>
+      <p class="mt-3 max-w-[68ch] text-ink-600 dark:text-ink-400">The same three lists the plugin shows you before it sends anything, plus what happens to them afterwards. Last updated 27 September 2026.</p>
 
       <h2 class="mt-10 text-h2 text-ink-900 dark:text-ink-50">Who runs this</h2>
       <p class="mt-2 max-w-[68ch]">Tickover is a trading name of an independent sole proprietor based in Vietnam. There is no company behind it yet. Questions, corrections and requests all go to the same place: hello&#64;tickover.dev, answered by a person.</p>
@@ -58,7 +58,7 @@ import { DERIVED_LIST, NEVER_LIST, SENT_LIST } from '../lib/disclosure'
       <h2 class="mt-10 text-h2 text-ink-900 dark:text-ink-50">Who else handles it</h2>
       <ul class="mt-2 max-w-[68ch] list-disc space-y-1 pl-5">
         <li><span class="font-medium">GitHub</span> — you sign in with it, and we read your account id, your login and the date the account was created. Nothing is written back.</li>
-        <li><span class="font-medium">Paddle</span> — the merchant of record for buyer payments. Buyers pay Paddle; we never see a card number. Paddle's checkout script loads on the buyer credits page and on no other page of this site.</li>
+        <li data-privacy="payments"><span class="font-medium">Payments</span> — buyers pay by PayPal. We keep the payment reference and amount for accounting, and nothing about any card. PayPal receives your name, email address and payment details and processes the payment.</li>
         <li><span class="font-medium">PayPal</span> — how developers are paid. We hold the PayPal address you give us and send it with a payout batch.</li>
       </ul>
       <p class="mt-2 max-w-[68ch]">There are no advertising networks here, no third-party analytics, and no tracking pixels. One cookie exists, named mw_session, and it is what keeps you signed in.</p>
@@ -78,8 +78,8 @@ import { DERIVED_LIST, NEVER_LIST, SENT_LIST } from '../lib/disclosure'
       </ul>
 
       <h2 class="mt-10 text-h2 text-ink-900 dark:text-ink-50">If this page changes</h2>
-      <p class="mt-2 max-w-[68ch]">The plugin is open source and so is <a mw-link [href]="historyUrl">this page's history</a>. A change that narrows what we collect needs no warning; a change that widens it will be shown in the consent screen again before it takes effect.</p>
-    </mw-shell>`,
+      <p class="mt-2 max-w-[68ch]">The plugin is open source and so is <a tk-link [href]="historyUrl">this page's history</a>. A change that narrows what we collect needs no warning; a change that widens it will be shown in the consent screen again before it takes effect.</p>
+    </tk-shell>`,
 })
 export default class PrivacyPage {
   /** R418: the public repository publishes this file at the same path, so its history is checkable. */

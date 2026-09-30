@@ -12,7 +12,16 @@ const BATCHES = '/api/admin/payouts/batches'
 const ID = 'batch_2026-09-10_abc'
 const CSV = 'payout_id,developer_id,paypal_email,amount_usd\n1,2,octo@pp.test,25.00\n'
 
-const batch = { batch_id: ID, adapter: 'manual-csv', count: 2, total_cents: 3500, artifact: CSV, created_at: '2026-09-10T10:00:00.000Z', paid_at: null, failed_at: null }
+// `status_counts.exported` matches `count`: this batch is freshly created, so
+// every payout in it is still awaiting either Send via PayPal or a CSV mark
+// (R518). A batch this branch's earlier tests built before PayPal Payouts
+// existed had no such field; the default the contract applies for an older
+// server's answer is `exported: 0`, which would hide Mark paid and Mark failed
+// on every one of them (ruling: those buttons claim only rows still exported).
+const batch = {
+  batch_id: ID, adapter: 'manual-csv', count: 2, total_cents: 3500, artifact: CSV, created_at: '2026-09-10T10:00:00.000Z', paid_at: null, failed_at: null,
+  status_counts: { exported: 2, sent: 0, unclaimed: 0, paid: 0, failed: 0, reversed: 0 },
+}
 
 /** One macrotask drains every pending microtask; `whenStable()` alone does not. */
 async function settle(fixture: ComponentFixture<unknown>) {
@@ -28,7 +37,7 @@ const squish = (s: string | null) => (s ?? '').replace(/\s+/g, ' ').trim()
 
 /**
  * Renders the page with the file-saving seam replaced and answers the opening
- * request. No `<mw-shell>` here: everything asserted below has to be something
+ * request. No `<tk-shell>` here: everything asserted below has to be something
  * this page produced, not something the layout supplied.
  */
 async function mount(rows: unknown[] | { status: number } = []) {
@@ -136,7 +145,7 @@ describe('admin PayoutsPage', () => {
     expect(m.panel()).toContain('this debits developers before any money moves')
     expect(m.panel()).toContain('available balance debited now, days before you pay it')
     expect(m.panel()).toContain('reads $0.00 available from this moment')
-    expect(m.panel()).toContain('Nothing is sent by us')
+    expect(m.panel()).toContain('Nothing is sent yet')
   })
 
   /**
@@ -238,5 +247,130 @@ describe('admin PayoutsPage', () => {
     m.http.expectNone(BATCHES)
     expect(squish(m.el.querySelector('[data-failed]')?.textContent ?? null))
       .toContain('a batch may have been created and debited')
+  })
+})
+
+describe('PayoutsPage — PayPal Payouts', () => {
+  const sendable = { ...batch, sendable: true }
+  const sentBatch = { ...batch, sent_at: '2026-09-10T11:00:00.000Z', provider_batch_id: 'PB-1', confirmed: true, sendable: false, refreshable: true, fees_cents: 70, status_counts: { exported: 0, sent: 1, unclaimed: 0, paid: 1, failed: 0, reversed: 0 } }
+  const unconfirmedSent = { ...batch, sent_at: '2026-09-10T11:00:00.000Z', confirmed: false, sendable: true, status_counts: { exported: 0, sent: 2, unclaimed: 0, paid: 0, failed: 0, reversed: 0 } }
+
+  it('offers Send via PayPal only on a batch the server calls sendable, behind a confirmation naming the total and the fee', async () => {
+    const m = await mount([sendable])
+    expect(m.el.querySelector(`[data-send-for="${ID}"]`)).not.toBeNull()
+    m.click(`[data-send-for="${ID}"]`)
+    m.fixture.detectChanges()
+    expect(m.panel()).toContain(formatCents(3500))
+    expect(m.panel()).toContain('2 developers')
+    expect(m.panel()).toContain('2%')
+    const m2 = await mount([batch])
+    expect(m2.el.querySelector(`[data-send-for="${ID}"]`)).toBeNull()
+  })
+
+  // A resend's confirmation must not repeat the first-send claim that the whole batch total goes
+  // out now -- an earlier send may already have paid some or all of it, and PayPal is not about to
+  // pay any of it a second time regardless of what this dialog says. The 2%-on-top line is first-
+  // send-only too: it was true of the money moving now, not of a batch already (partly) sent.
+  it('says a resend goes to PayPal again, not that the whole total goes out now, and drops the first-send fee line', async () => {
+    const m = await mount([unconfirmedSent])
+    m.click(`[data-send-for="${ID}"]`)
+    m.fixture.detectChanges()
+    expect(m.panel()).toContain('sent again')
+    expect(m.panel()).toContain('not pay')
+    expect(m.panel()).not.toContain('2%')
+    expect(m.panel()).not.toContain(formatCents(unconfirmedSent.total_cents))
+  })
+
+  it('sends, then reloads the list', async () => {
+    const m = await mount([sendable])
+    m.click(`[data-send-for="${ID}"]`)
+    m.fixture.detectChanges()
+    m.click('[data-confirm] [data-go]')
+    m.http.expectOne(`${BATCHES}/${ID}/send`).flush(sentBatch)
+    await drain()
+    m.http.expectOne(BATCHES).flush([sentBatch])
+    await settle(m.fixture)
+    expect(m.el.querySelector(`[data-refresh-for="${ID}"]`)).not.toBeNull()
+    expect(m.el.querySelector(`[data-paid-for="${ID}"]`)).toBeNull()
+  })
+
+  it('says a send PayPal did not confirm, and offers Send again', async () => {
+    const m = await mount([unconfirmedSent])
+    expect(m.el.querySelector(`[data-unconfirmed="${ID}"]`)?.textContent).toContain('not confirmed by PayPal')
+    expect(m.el.querySelector(`[data-send-for="${ID}"]`)?.textContent).toContain('Send again')
+  })
+
+  it('refreshes a sent batch', async () => {
+    const m = await mount([sentBatch])
+    m.click(`[data-refresh-for="${ID}"]`)
+    m.http.expectOne(`${BATCHES}/${ID}/refresh`).flush(sentBatch)
+    await drain()
+    m.http.expectOne(BATCHES).flush([sentBatch])
+    await settle(m.fixture)
+  })
+
+  it('lists failed and reversed payouts with the reason', async () => {
+    const m = await mount([{ ...sentBatch, problems: [{ payout_id: 'p1', github_login: 'octo', cents: 2500, status: 'failed', reason: 'RECEIVER_UNREGISTERED' }] }])
+    const p = m.el.querySelector(`[data-problems="${ID}"]`)
+    expect(p?.textContent).toContain('octo')
+    expect(p?.textContent).toContain('RECEIVER_UNREGISTERED')
+    expect(p?.textContent).toContain(formatCents(2500))
+  })
+
+  it('shows the error PayPal gave when a send fails', async () => {
+    const m = await mount([sendable])
+    m.click(`[data-send-for="${ID}"]`)
+    m.fixture.detectChanges()
+    m.click('[data-confirm] [data-go]')
+    m.http.expectOne(`${BATCHES}/${ID}/send`).flush({ error: 'paypal_rejected', message: 'PayPal refused the batch: AUTHORIZATION_ERROR. It is unsent again; the CSV still works.' }, { status: 502, statusText: 'Bad Gateway' })
+    await settle(m.fixture)
+    expect(m.el.querySelector('[data-failed]')?.textContent).toContain('AUTHORIZATION_ERROR')
+  })
+
+  /**
+   * Controller ruling 1: the gate on Mark paid / Mark failed is
+   * `status_counts.exported > 0`, not merely the absence of `sent_at`. A batch
+   * fully sent (nothing left exported) offers neither button, whether or not it
+   * is also offering Refresh.
+   */
+  it('does not offer Mark paid or Mark failed on a sent batch with nothing left exported', async () => {
+    const m = await mount([sentBatch])
+    expect(m.el.querySelector(`[data-paid-for="${ID}"]`)).toBeNull()
+    expect(m.el.querySelector(`[data-failed-for="${ID}"]`)).toBeNull()
+  })
+
+  /**
+   * Controller ruling 2: any failed action shows the server's own `message`
+   * when the error body carries one, not just the two actions Step 5 names by
+   * example (`paypal_rejected` on send). `send_in_progress` is the case a
+   * concurrent operator hits, and its message is the one line that tells them
+   * what to do instead of retrying blind.
+   */
+  it('shows the server message on a 409 send-in-progress rather than the fixed fallback', async () => {
+    const m = await mount([sendable])
+    m.click(`[data-send-for="${ID}"]`)
+    m.fixture.detectChanges()
+    m.click('[data-confirm] [data-go]')
+    m.http.expectOne(`${BATCHES}/${ID}/send`).flush({ error: 'send_in_progress', message: 'A send of this batch is already in progress. Wait a minute and reload.' }, { status: 409, statusText: 'Conflict' })
+    await settle(m.fixture)
+    expect(m.el.querySelector('[data-failed]')?.textContent).toContain('already in progress')
+  })
+
+  /**
+   * Fix round 1 (review finding, extends R520). Paying the CSV after a PayPal
+   * send may have gone through is a double payment, so the CSV button has to
+   * disappear the moment a batch is sent -- confirmed or not, since an
+   * unconfirmed send may still land. `[data-csv]` on an unsent batch is
+   * already covered by "hands over the artifact bytes" and "draws a failed
+   * batch as failed" above -- both fixtures have `sent_at` unset (spec (c)).
+   */
+  it('offers no CSV on a batch sent to PayPal but not yet confirmed', async () => {
+    const m = await mount([unconfirmedSent])
+    expect(m.el.querySelector(`[data-csv="${ID}"]`)).toBeNull()
+  })
+
+  it('offers no CSV on a batch PayPal has confirmed', async () => {
+    const m = await mount([sentBatch])
+    expect(m.el.querySelector(`[data-csv="${ID}"]`)).toBeNull()
   })
 })

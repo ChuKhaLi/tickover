@@ -32,7 +32,7 @@ const REASON_MAX = DeveloperStatusInput.shape.reason.unwrap().maxLength ?? 200
 @Component({
   imports: [FormsModule, DatePipe, Confirm, Chip, Banner, Button, Empty, Input, PageHeader, Rows],
   template: `
-    <mw-page-header heading="Developers" />
+    <tk-page-header heading="Developers" />
     <!-- What each status actually does, because none of it is guessable from the
          word. Flagged in particular reads like a note-to-self and is not one: a
          payout batch only pays developers whose status is active, so flagging
@@ -49,14 +49,14 @@ const REASON_MAX = DeveloperStatusInput.shape.reason.unwrap().maxLength ?? 200
 
     <div class="mt-3 flex gap-2">
       @for (t of tabs; track t) {
-        <button type="button" mw-chip [selected]="tab() === t" [attr.data-tab]="t" (click)="load(t)">{{ t }}</button>
+        <button type="button" tk-chip [selected]="tab() === t" [attr.data-tab]="t" (click)="load(t)">{{ t }}</button>
       }
     </div>
 
-    @if (loadFailed()) { <mw-banner data-load-failed class="mt-3" tone="error">Could not load the {{ tab() }} developers, so this list may be out of date or incomplete.</mw-banner> }
-    @if (actionFailed(); as why) { <mw-banner data-failed class="mt-3" tone="error">{{ why }}</mw-banner> }
+    @if (loadFailed()) { <tk-banner data-load-failed class="mt-3" tone="error">Could not load the {{ tab() }} developers, so this list may be out of date or incomplete.</tk-banner> }
+    @if (actionFailed(); as why) { <tk-banner data-failed class="mt-3" tone="error">{{ why }}</tk-banner> }
 
-    <table mw-rows class="mt-4">
+    <table tk-rows class="mt-4">
       <thead><tr><th>Login</th><th>Status</th><th>Reason</th><th>Country</th><th>Tier</th><th>Last seen</th><th></th></tr></thead>
       <tbody>
         @for (d of rows(); track d.id) {
@@ -73,9 +73,9 @@ const REASON_MAX = DeveloperStatusInput.shape.reason.unwrap().maxLength ?? 200
                  this one red as well says "destructive" twice for one act. -->
             <td class="text-right">
               <span class="inline-flex flex-wrap justify-end gap-3">
-                @if (d.status !== 'active') { <button type="button" [attr.data-reinstate]="d.id" mw-button variant="quiet" size="sm" [disabled]="busy()" (click)="arm(d.id, 'active')">Reinstate</button> }
-                @if (d.status !== 'flagged') { <button type="button" [attr.data-flag]="d.id" mw-button variant="quiet" size="sm" [disabled]="busy() || !reason(d.id)" (click)="arm(d.id, 'flagged')">Flag</button> }
-                @if (d.status !== 'banned') { <button type="button" [attr.data-ban]="d.id" mw-button variant="quiet" size="sm" [disabled]="busy() || !reason(d.id)" (click)="arm(d.id, 'banned')">Ban</button> }
+                @if (d.status !== 'active') { <button type="button" [attr.data-reinstate]="d.id" tk-button variant="quiet" size="sm" [disabled]="busy()" (click)="arm(d.id, 'active')">Reinstate</button> }
+                @if (d.status !== 'flagged') { <button type="button" [attr.data-flag]="d.id" tk-button variant="quiet" size="sm" [disabled]="busy() || !reason(d.id)" (click)="arm(d.id, 'flagged')">Flag</button> }
+                @if (d.status !== 'banned') { <button type="button" [attr.data-ban]="d.id" tk-button variant="quiet" size="sm" [disabled]="busy() || !reason(d.id)" (click)="arm(d.id, 'banned')">Ban</button> }
               </span>
             </td>
           </tr>
@@ -92,42 +92,42 @@ const REASON_MAX = DeveloperStatusInput.shape.reason.unwrap().maxLength ?? 200
                    Two words are avoided on purpose here, and the first draft of this
                    comment used both: the one for a shown element and the one for a grid
                    of rows are each a utility name, and Tailwind minted both (R47). -->
-              <input mw-input size="sm" class="max-w-md" [name]="'reason' + d.id" [attr.name]="'reason' + d.id" [attr.data-reason]="d.id" [attr.aria-label]="'Reason, recorded against ' + d.github_login" [(ngModel)]="reasons[d.id]" [attr.maxlength]="reasonMax" placeholder="reason, recorded against this developer ({{ reasonMax }} characters)" />
+              <input tk-input size="sm" class="max-w-md" [name]="'reason' + d.id" [attr.name]="'reason' + d.id" [attr.data-reason]="d.id" [attr.aria-label]="'Reason, recorded against ' + d.github_login" [(ngModel)]="reasons[d.id]" [attr.maxlength]="reasonMax" placeholder="reason, recorded against this developer ({{ reasonMax }} characters)" />
 
               @if (armedFor(d.id, 'flagged')) {
-                <mw-confirm heading="Flag {{ d.github_login }}: this quietly stops their payouts." action="Flag" [busy]="busy()" (go)="set(d.id, 'flagged', d.status)" (cancel)="disarm()">
+                <tk-confirm heading="Flag {{ d.github_login }}: this quietly stops their payouts." action="Flag" [busy]="busy()" (go)="set(d.id, 'flagged', d.status)" (cancel)="disarm()">
                   <ul class="mt-1 list-disc space-y-1 pl-5">
                     <li>They go on answering and go on earning, and nothing on their earnings page says anything is wrong.</li>
                     <li>They are left out of every payout run for as long as they are flagged, so the money accumulates unpaid.</li>
                     <li>Recorded against them: {{ reason(d.id) }}</li>
                   </ul>
-                </mw-confirm>
+                </tk-confirm>
               }
               @if (armedFor(d.id, 'banned')) {
-                <mw-confirm heading="Ban {{ d.github_login }}: this ends the account." action="Ban" [busy]="busy()" (go)="set(d.id, 'banned', d.status)" (cancel)="disarm()">
+                <tk-confirm heading="Ban {{ d.github_login }}: this ends the account." action="Ban" [busy]="busy()" (go)="set(d.id, 'banned', d.status)" (cancel)="disarm()">
                   <ul class="mt-1 list-disc space-y-1 pl-5">
                     <li>Their command-line token stops working and every browser session ends, so they cannot answer again.</li>
                     <li>They are left out of every payout run, so anything they are owed stays unpaid until someone reinstates them.</li>
                     <li>Recorded against them: {{ reason(d.id) }}</li>
                   </ul>
-                </mw-confirm>
+                </tk-confirm>
               }
               @if (armedFor(d.id, 'active')) {
-                <mw-confirm heading="Reinstate {{ d.github_login }}: this undoes the {{ d.status }}." action="Reinstate" variant="primary" [busy]="busy()" (go)="set(d.id, 'active', d.status)" (cancel)="disarm()">
+                <tk-confirm heading="Reinstate {{ d.github_login }}: this undoes the {{ d.status }}." action="Reinstate" variant="primary" [busy]="busy()" (go)="set(d.id, 'active', d.status)" (cancel)="disarm()">
                   <ul class="mt-1 list-disc space-y-1 pl-5">
                     <li>They answer and are paid again, including anything that accumulated while they were {{ d.status }}.</li>
                     <li>Read the reason before you do it: {{ d.flag_reason ?? blank }}</li>
                     <li>"deleted by user" is a developer who asked to be deleted, not a developer to bring back. Reinstating one puts an account they asked to close back into payout runs.</li>
                     <li>The reason is kept on the row afterwards, marked as past, so the record of why survives this.</li>
                   </ul>
-                </mw-confirm>
+                </tk-confirm>
               }
             </td>
           </tr>
         } @empty {
           <tr><td colspan="7">
             @if (loading()) { <p data-loading class="py-3 text-small text-ink-600 dark:text-ink-400">Loading…</p> }
-            @else if (!loadFailed()) { <mw-empty says="No {{ tab() }} developers." /> }
+            @else if (!loadFailed()) { <tk-empty says="No {{ tab() }} developers." /> }
           </td></tr>
         }
       </tbody>

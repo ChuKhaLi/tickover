@@ -3,7 +3,7 @@ import { RouterLink } from '@angular/router'
 import { SITE } from '@tickover/contract'
 
 @Component({
-  selector: 'mw-shell',
+  selector: 'tk-shell',
   imports: [RouterLink],
   template: `
     <div class="min-h-screen flex flex-col">
@@ -54,9 +54,9 @@ export class Shell {
   links = input<Array<{ href: string; label: string }>>([])
   /**
    * Fixed, not an input: these are on every page or they are on none. Refunds is a section of the
-   * buyer terms, linked by fragment because Paddle's domain review wants the refund policy
-   * reachable from the navigation (R417). The fragment is its own input: typed into the path,
-   * routerLink encodes the hash and the link lands nowhere.
+   * buyer terms, linked by fragment so the refund policy stays reachable from the navigation
+   * (R500). The fragment is its own input: typed into the path, routerLink encodes the hash and
+   * the link lands nowhere.
    */
   /** R418: the public repository, so the open-source claims on these pages can be checked. */
   sourceRepo = SITE.SOURCE_REPO

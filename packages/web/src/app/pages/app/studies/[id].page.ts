@@ -1,5 +1,6 @@
-import { Component, DestroyRef, computed, inject, signal } from '@angular/core'
-import { ActivatedRoute, RouterLink } from '@angular/router'
+import { Component, DestroyRef, computed, effect, inject, signal } from '@angular/core'
+import { ActivatedRoute, Router, RouterLink } from '@angular/router'
+import { take } from 'rxjs'
 import type { RouteMeta } from '@analogjs/router'
 import type { StudyResults, StudyView } from '@tickover/contract'
 import { ApiService, ApiError } from '../../../lib/api'
@@ -45,45 +46,77 @@ type LoadFailure = 'error' | 'gone'
   imports: [Money, Banner, Bar, Button, Card, Link, PageHeader, Figure, Meta, Rows, StudyBadge, StateTrack, RouterLink],
   template: `
     @if (failed() === 'gone') {
-      <mw-banner tone="error">This study is not available. It may have been deleted, or this account may not have access to it. <a mw-link routerLink="/app">Back to your studies</a></mw-banner>
+      <tk-banner tone="error">This study is not available. It may have been deleted, or this account may not have access to it. <a tk-link routerLink="/app">Back to your studies</a></tk-banner>
     } @else if (failed() === 'error') {
-      <mw-banner tone="error">Couldn't load this study. Reload the page to try again.</mw-banner>
+      <tk-banner tone="error">Couldn't load this study. Reload the page to try again.</tk-banner>
     } @else if (study(); as s) {
-      <mw-page-header [heading]="s.title">
-        <mw-study-badge mw-header-aside [state]="s.state" />
-      </mw-page-header>
+      <tk-page-header [heading]="s.title">
+        <tk-study-badge tk-header-aside [state]="s.state" />
+      </tk-page-header>
       <!-- The sequence design system 1 says is the one honest step indicator in this
            product. It answers the question the chip beside the heading cannot: not
            which state, but how far along. Nothing is drawn for a rejected study,
            which left the sequence rather than stopping inside it. -->
-      <mw-state-track class="mb-4 max-w-md" [state]="s.state" />
+      <tk-state-track class="mb-4 max-w-md" [state]="s.state" />
       <!-- Every figure on this page is the server's. There is no price in the
            markup: what a response costs depends on targeting and on the at-cost
            entitlement, so a number written here would be wrong for three of the
            four configurations (R49, R58). -->
-      <p mw-meta>
+      <p tk-meta>
         <span>Sponsor {{ s.sponsor }}</span>
-        <span><mw-money [cents]="s.price_cents" /> per response</span>
+        <span><tk-money [cents]="s.price_cents" /> per response</span>
         @if (s.at_cost) { <span>your first study, at cost</span> }
       </p>
 
       @if (s.review_note) {
-        <mw-banner class="mt-4" tone="warn">Reviewer note: {{ s.review_note }}</mw-banner>
+        <tk-banner class="mt-4" tone="warn">Reviewer note: {{ s.review_note }}</tk-banner>
       }
 
+      <!-- Shown in whatever state the study is in when the buyer lands back here
+           from PayPal -- a successful capture has already moved it on to
+           in_review by the time this renders, so the notice cannot be gated on
+           awaiting_payment the way the panel below is. -->
+      @if (paypalNotice(); as n) { <tk-banner class="mt-4" [tone]="n.tone">{{ n.text }}</tk-banner> }
+
       @if (s.state === 'draft') {
-        <button type="button" mw-button class="mt-4" (click)="submit(s.id)" [disabled]="submitting()">Submit for review</button>
-        @if (needCents(); as n) { <mw-banner class="mt-2" tone="error">You need <mw-money [cents]="n" /> in credits to submit. <a mw-link routerLink="/app/credits">Buy credits</a></mw-banner> }
-        @if (submitFailed()) { <mw-banner class="mt-2" tone="error">Couldn't send this study for review, and it is still a draft. Try again.</mw-banner> }
+        <button type="button" tk-button class="mt-4" (click)="submit(s.id)" [disabled]="submitting()">Submit for review</button>
+        @if (submitFailed()) { <tk-banner class="mt-2" tone="error">Couldn't send this study for review, and it is still a draft. Try again.</tk-banner> }
+      }
+      @if (s.state === 'awaiting_payment') {
+        <!-- R500: nothing is held and nothing is charged until the payment arrives and the study is
+             reviewed; the panel says so, because the buyer is about to send money on its word. -->
+        <div tk-card rank="raised" pad="lg" class="mt-4 max-w-[68ch]" data-awaiting>
+          <!-- With PayPal on and no bank details configured, PayPal is the only way to pay: no bank
+               transfer to point at, no reference to put on one, no details coming by email. -->
+          @if (s.paypal_available) {
+            <button type="button" tk-button class="mb-3" data-paypal (click)="payWithPayPal(s.id)" [disabled]="submitting()">Pay with PayPal</button>
+            @if (paypalFailed()) {
+              <tk-banner class="mb-3" tone="error">{{ s.payment_instructions ? 'PayPal could not be opened. Try again, or pay by bank transfer.' : 'PayPal could not be opened. Try again in a moment.' }}</tk-banner>
+            }
+            @if (s.payment_instructions) { <p class="text-small text-ink-600 dark:text-ink-400">Or pay by bank transfer:</p> }
+          }
+          <p class="text-ink-900 dark:text-ink-50">Amount due: <tk-money [cents]="s.amount_due_cents" /></p>
+          @if (!s.paypal_available || s.payment_instructions) {
+            <p class="mt-1 max-w-[68ch] text-small text-ink-600 dark:text-ink-400">Reference: <span class="font-mono">{{ s.payment_reference }}</span>. Put it on the payment so it can be matched to this study.</p>
+            @if (s.payment_instructions; as pi) {
+              <pre class="mt-3 whitespace-pre-wrap font-mono text-small text-ink-800 dark:text-ink-100" data-instructions>{{ pi }}</pre>
+            } @else {
+              <p class="mt-3 text-small text-ink-600 dark:text-ink-400" data-no-instructions>Payment details will be sent to you by email.</p>
+            }
+          }
+          <p class="mt-3 max-w-[68ch] text-small text-ink-600 dark:text-ink-400">Review starts once the payment arrives, usually within one working day. You are not charged if the study is not approved.</p>
+          <button type="button" tk-button variant="secondary" size="sm" class="mt-4" data-withdraw (click)="withdraw(s.id)" [disabled]="submitting()">Withdraw</button>
+          @if (withdrawFailed()) { <tk-banner class="mt-2" tone="error">Couldn't withdraw this study. Reload the page to see where it stands.</tk-banner> }
+        </div>
       }
 
       <section class="mt-6">
         <div class="flex justify-between text-small"><span>Respondents {{ s.respondents_completed }} / {{ s.target_count }}</span><span class="tabular-nums">{{ progress(s) }}%</span></div>
-        <mw-bar data-progress class="mt-1 block" [pct]="progress(s)" />
-        <p mw-meta class="mt-2">
-          <span>Held <mw-money [cents]="s.hold_cents" /></span>
-          <span>Charged <mw-money [cents]="s.charged_cents" /></span>
-          <span>Refunded <mw-money [cents]="s.refunded_cents" /></span>
+        <tk-bar data-progress class="mt-1 block" [pct]="progress(s)" />
+        <p tk-meta class="mt-2">
+          <span>Held <tk-money [cents]="s.hold_cents" /></span>
+          <span>Charged <tk-money [cents]="s.charged_cents" /></span>
+          <span>Refunded <tk-money [cents]="s.refunded_cents" /></span>
         </p>
       </section>
 
@@ -91,14 +124,14 @@ type LoadFailure = 'error' | 'gone'
            The figures above are the last the server sent either way, so neither
            branch throws them away. -->
       @if (stalled() === 'signed_out') {
-        <mw-banner class="mt-3" tone="warn">Your sign-in has ended, so these figures stopped updating. <a mw-link routerLink="/app/login">Sign in</a> again to keep watching.</mw-banner>
+        <tk-banner class="mt-3" tone="warn">Your sign-in has ended, so these figures stopped updating. <a tk-link routerLink="/app/login">Sign in</a> again to keep watching.</tk-banner>
       } @else if (stalled() === 'gone') {
-        <mw-banner class="mt-3" tone="warn">This study is no longer available, so these figures stopped updating. It may have been deleted, or this account may have lost access to it.</mw-banner>
+        <tk-banner class="mt-3" tone="warn">This study is no longer available, so these figures stopped updating. It may have been deleted, or this account may have lost access to it.</tk-banner>
       } @else if (stalled() === 'server') {
         <!-- "Still trying" is claimed only where it is true. A study that is not
              live has no poll to retry with, and a page asserting that it is
              working on it is the reassuring label on a dead page. -->
-        <mw-banner class="mt-3" tone="warn">These figures stopped updating because the server did not answer. They are the last it sent@if (s.state === 'live') {, and this page is still trying} @else {, and reloading the page is what will refresh them}.</mw-banner>
+        <tk-banner class="mt-3" tone="warn">These figures stopped updating because the server did not answer. They are the last it sent@if (s.state === 'live') {, and this page is still trying} @else {, and reloading the page is what will refresh them}.</tk-banner>
       }
 
       @if (results(); as r) {
@@ -109,10 +142,10 @@ type LoadFailure = 'error' | 'gone'
              the money is built from: settlement charges the study's price for
              each valid non-attention answer, so charged_cents is this number
              times the price above. -->
-        <p mw-meta class="mt-8">
+        <p tk-meta class="mt-8">
           <span>{{ r.valid_responses }} valid answers from {{ r.respondents_completed }} respondents</span>
           @if (s.state === 'settled') {
-            <a mw-link [href]="csvUrl(s.id)">Download CSV</a>
+            <a tk-link [href]="csvUrl(s.id)">Download CSV</a>
           } @else {
             <span>CSV export opens when the study settles</span>
           }
@@ -127,7 +160,7 @@ type LoadFailure = 'error' | 'gone'
         }
 
         @for (q of questions(); track q.id) {
-          <section mw-card pad="lg" class="mt-6">
+          <section tk-card pad="lg" class="mt-6">
             <h2 class="text-h3 text-ink-900 dark:text-ink-50">{{ q.heading }}</h2>
             <ul class="mt-3 space-y-2">
               @for (row of q.rows; track $index) {
@@ -142,7 +175,7 @@ type LoadFailure = 'error' | 'gone'
                        this sentence now avoids: it names a CSS position, and a
                        space after it is all Tailwind's scanner needs. -->
                   <div class="flex justify-between gap-4 text-small"><span>{{ row.option }}</span><span class="flex shrink-0 gap-4 tabular-nums"><span class="text-ink-600 dark:text-ink-400">{{ row.count }}</span><span class="w-12 text-right">{{ row.pct }}%</span></span></div>
-                  <mw-bar class="mt-1 block" [pct]="row.pct" />
+                  <tk-bar class="mt-1 block" [pct]="row.pct" />
                 </li>
               }
             </ul>
@@ -150,11 +183,11 @@ type LoadFailure = 'error' | 'gone'
               <details class="mt-4">
                 <summary class="cursor-pointer text-small text-ink-600 dark:text-ink-400">By {{ labels[t.segment] }}</summary>
                 <div class="overflow-x-auto">
-                  <table mw-rows class="mt-2">
-                    <thead><tr><th>{{ labels[t.segment] }}</th><th mw-figure>n</th>@for (o of q.options; track $index) { <th mw-figure>{{ o }}</th> }</tr></thead>
+                  <table tk-rows class="mt-2">
+                    <thead><tr><th>{{ labels[t.segment] }}</th><th tk-figure>n</th>@for (o of q.options; track $index) { <th tk-figure>{{ o }}</th> }</tr></thead>
                     <tbody>
                       @for (row of t.rows; track row.key) {
-                        <tr><td>{{ row.key }}</td><td mw-figure>{{ row.total }}</td>@for (c of row.cells; track $index) { <td mw-figure>{{ c }}%</td> }</tr>
+                        <tr><td>{{ row.key }}</td><td tk-figure>{{ row.total }}</td>@for (c of row.cells; track $index) { <td tk-figure>{{ c }}%</td> }</tr>
                       }
                     </tbody>
                   </table>
@@ -170,14 +203,19 @@ export default class StudyPage {
   private api = inject(ApiService)
   private auth = inject(AuthState)
   private route = inject(ActivatedRoute)
+  private router = inject(Router)
 
   study = signal<StudyView | null>(null)
   results = signal<StudyResults | null>(null)
   failed = signal<LoadFailure | null>(null)
   stalled = signal<Stall | null>(null)
-  needCents = signal<number | null>(null)
   submitFailed = signal(false)
   submitting = signal(false)
+  withdrawFailed = signal(false)
+  paypalFailed = signal(false)
+  paypalNotice = signal<{ text: string; tone: 'done' | 'warn' | 'error' } | null>(null)
+  /** Navigation seam: a test replaces it rather than leaving the page. */
+  go: (url: string) => void = (url) => { location.href = url }
 
   labels = SEGMENT_LABELS
 
@@ -233,6 +271,35 @@ export default class StudyPage {
       const id = p.get('id')
       if (id) this.open(id)
     })
+
+    // R505: the buyer returns from PayPal on this same URL, `?paypal=...&token=...`.
+    // Read the query once here -- `take(1)` makes that literal instead of merely
+    // intended: the query is emptied below once handled, and a subscription left
+    // open would read that emptied value right back and think nothing was ever
+    // there. It would also read ahead of the effect below on an unrelated
+    // navigation that changes the query before the study has loaded, losing the
+    // value this component arrived with.
+    let query: { paypal?: string; token?: string } = {}
+    this.route.queryParamMap.pipe(take(1)).subscribe((q) => {
+      query = { paypal: q.get('paypal') ?? undefined, token: q.get('token') ?? undefined }
+    })
+    // Waits on the study signal rather than hanging off `load` directly: this
+    // subscription and the one above race, and either can resolve first.
+    const stop = effect(() => {
+      const s = this.study()
+      if (!s) return
+      // Destroyed before the await below, not after: a successful capture sets
+      // `study` itself inside `afterPayPal`, a second, genuine emission this same
+      // effect watches -- undestroyed, it would capture a second time (R505).
+      stop.destroy()
+      // Only a visit PayPal actually sent the buyer back from rewrites the URL
+      // (Review Focus #2): an ordinary visit has no `paypal` key at all, and
+      // `afterPayPal` returning early for it must not still edit the address bar.
+      const arrivedFromPayPal = query.paypal !== undefined
+      void this.afterPayPal(s.id, query).then(() => {
+        if (arrivedFromPayPal) this.router.navigate([], { queryParams: {}, replaceUrl: true })
+      })
+    })
   }
 
   /**
@@ -266,8 +333,12 @@ export default class StudyPage {
     this.results.set(null)
     this.failed.set(null)
     this.stalled.set(null)
-    this.needCents.set(null)
+    this.withdrawFailed.set(false)
     this.submitFailed.set(false)
+    // A notice from the study just left (a cancel, a stuck capture) belongs to
+    // that study's return trip, not to whatever this URL names next.
+    this.paypalNotice.set(null)
+    this.paypalFailed.set(false)
     // Not gated on `loading`: a request still out for the study just left must
     // never delay the one the URL now names. Its response is discarded below.
     this.loading = false
@@ -285,7 +356,6 @@ export default class StudyPage {
   csvUrl(id: string): string { return `/api/buyer/studies/${id}/results.csv` }
 
   async submit(id: string): Promise<void> {
-    this.needCents.set(null)
     this.submitFailed.set(false)
     this.submitting.set(true)
     try {
@@ -295,17 +365,54 @@ export default class StudyPage {
       // The hold is taken at submit, so the credit figure in the chrome is stale
       // until the principal is read back. Failing to read it is not a failure to
       // submit, and reporting it as one would invite a second submit -- the
-      // ambiguity that cost Task 5 a duplicate paid study (R60).
+      // ambiguity that cost Task 5 a duplicate paid study (R60). A covered submit
+      // still changes the balance even though this study now waits on payment.
       await this.auth.refreshBuyer().catch(() => undefined)
-    } catch (e) {
-      const need = e instanceof ApiError && e.status === 402 ? (e.body as { required_cents?: unknown } | null)?.required_cents : undefined
-      // A 402 whose body does not carry the amount is not something to render:
-      // an undefined here reaches the money component and prints a dollar sign
-      // with NaN after it.
-      if (typeof need === 'number') this.needCents.set(need)
-      else this.submitFailed.set(true)
+    } catch {
+      this.submitFailed.set(true)
     } finally {
       this.submitting.set(false)
+    }
+  }
+
+  async withdraw(id: string): Promise<void> {
+    this.withdrawFailed.set(false)
+    this.submitting.set(true)
+    try {
+      this.study.set(await this.api.withdrawStudy(id))
+    } catch {
+      this.withdrawFailed.set(true)
+    } finally {
+      this.submitting.set(false)
+    }
+  }
+
+  async payWithPayPal(id: string): Promise<void> {
+    this.paypalFailed.set(false)
+    this.submitting.set(true)
+    try { this.go((await this.api.paypalOrder(id)).approve_url) } catch { this.paypalFailed.set(true) } finally { this.submitting.set(false) }
+  }
+
+  /**
+   * Runs once, after the study first loads, when PayPal sent the buyer back here
+   * (R505). Any capture failure -- including a 409 for a capture already in
+   * flight elsewhere -- shows the same notice below; the buyer cannot tell those
+   * apart and reloading is the recovery for all of them alike.
+   */
+  private async afterPayPal(id: string, q: { paypal?: string; token?: string }): Promise<void> {
+    if (q.paypal === 'cancelled') { this.paypalNotice.set({ text: 'PayPal checkout was cancelled, so nothing was charged.', tone: 'warn' }); return }
+    if (q.paypal !== 'approved' || !q.token) return
+    this.paypalNotice.set({ text: 'Payment received, submitting your study…', tone: 'warn' })
+    try {
+      this.study.set(await this.api.paypalCapture(id, q.token))
+      // Same as `submit`: a capture can move money onto the buyer's credit (a
+      // withdrawn-study race banks it there instead of submitting anything, R507),
+      // so the header figure is stale until the principal is read back. Failing to
+      // read it is not a failure of the capture, which already succeeded.
+      await this.auth.refreshBuyer().catch(() => undefined)
+      this.paypalNotice.set({ text: 'Payment received.', tone: 'done' })
+    } catch {
+      this.paypalNotice.set({ text: 'We could not confirm the PayPal payment yet. If you were charged it will appear here within a few minutes; reload to check.', tone: 'error' })
     }
   }
 

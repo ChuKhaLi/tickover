@@ -36,7 +36,7 @@ const VARIANT: Record<ButtonVariant, string> = {
  * rather than an action, and naming the role is what stops a third being invented.
  */
 @Directive({
-  selector: 'a[mw-link]',
+  selector: 'a[tk-link]',
   host: { class: 'underline text-signal-600 hover:text-signal-700 dark:text-signal-300 dark:hover:text-signal-200' },
 })
 export class Link {}
@@ -69,10 +69,10 @@ const ALWAYS =
  * or a button that behaves like one.
  */
 @Directive({
-  selector: 'button[mw-button], a[mw-button]',
+  selector: 'button[tk-button], a[tk-button]',
   host: {
     '[class]': 'classes()',
-    '[attr.data-mw-control]': '""',
+    '[attr.data-tk-control]': '""',
   },
 })
 export class Button {

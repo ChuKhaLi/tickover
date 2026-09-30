@@ -20,6 +20,9 @@ const DEV: DeveloperSelf = {
   activity_tier: 'regular',
   can_cash_out: true,
   payout_method: null,
+  payout_method_needs_confirm: false,
+  unclaimed_cents: 0,
+  unclaimed_email: null,
 }
 
 const DATA: DataSummary = {
@@ -374,5 +377,35 @@ describe('developer SettingsPage', () => {
     expect(auth.developer()).toMatchObject({ id: DEV.id })
     expect(router.url).toBe('/somewhere')
     expect(flat(el)).toContain("Couldn't delete your account")
+  })
+
+  // R515, mirrored from index.page.spec.ts. Both banners render off `auth.developer()`
+  // directly, so the pending `/api/dev/web/data` request does not need to be flushed
+  // to see them.
+  // Same distinction as index.page.spec.ts: the notice names `unclaimed_email` (frozen at batch
+  // creation), not the developer's current `payout_method.email`, which this fixture deliberately
+  // sets to a different address.
+  it('tells the developer money is waiting for them at PayPal, naming the address it was sent to', () => {
+    const { el } = mount({ unclaimed_cents: 2500, unclaimed_email: 'old@pp.test', payout_method: { type: 'paypal', email: 'new@pp.test' } })
+    const note = el.querySelector('[data-unclaimed]')
+    expect(note?.textContent).toContain('$25.00')
+    expect(note?.textContent).toContain('old@pp.test')
+    expect(note?.textContent).not.toContain('new@pp.test')
+    expect(note?.textContent).toContain('30 days')
+  })
+
+  // Settings is the page to act on, not to leave from: no link away from itself.
+  it('tells the developer to confirm a PayPal address that could not be paid, with nowhere else to go', () => {
+    const { el } = mount({ payout_method_needs_confirm: true, payout_method: { type: 'paypal', email: 'me@pp.test' } })
+    const note = el.querySelector('[data-needs-confirm]')
+    expect(note?.textContent).toContain('could not deliver')
+    expect(note?.querySelector('a')).toBeNull()
+  })
+
+  // Both notices are for a state, not a default: most developers hit neither.
+  it('shows neither notice by default', () => {
+    const { el } = mount()
+    expect(el.querySelector('[data-unclaimed]')).toBeNull()
+    expect(el.querySelector('[data-needs-confirm]')).toBeNull()
   })
 })

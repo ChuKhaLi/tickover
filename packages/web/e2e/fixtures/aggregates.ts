@@ -4,7 +4,7 @@ import type { z } from 'zod'
 // Five questions with realistic option text and non-zero counts, typed against the contract
 // schema rather than a shape guessed by hand. The Lighthouse gate (`scripts/lighthouse.ts`) serves
 // this behind `/api/public/aggregates` so `/data` renders its real layout — the CLS the spec
-// targets comes from the `mw-async` block that arrives after first paint, and a static tree with
+// targets comes from the `tk-async` block that arrives after first paint, and a static tree with
 // no API would always audit `/data` in its permanent failure state instead. Task 5's e2e tests
 // reuse the same fixture, so both suites measure against one set of numbers.
 export const AGGREGATES_FIXTURE: z.infer<typeof AggregatesResponse> = {

@@ -1,5 +1,5 @@
 // Written under R42 (plan 2), when every prerendered route shipped an empty
-// `<mw-root></mw-root>` and the head was the only part of these pages a link
+// `<tk-root></tk-root>` and the head was the only part of these pages a link
 // preview could read. R400 renders the bodies now, but a link preview still reads
 // only the head — and spec §7 Phase 0 posts these URLs to r/ClaudeAI, r/cursor and
 // X. Nothing else in the suite touches `index.html`; deleting every og tag was
@@ -15,6 +15,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, it, expect } from 'vitest'
 import { PAGE_META, SITE_URL } from '../../src/app/lib/page-meta'
 import { OG_IMAGE_PATH } from '../../src/app/lib/seo'
+import { tokenSource } from './token-source'
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 const source = readFileSync(resolve(packageRoot, 'index.html'), 'utf8')
@@ -50,7 +51,7 @@ describe('index.html', () => {
   it('paints the browser chrome the dark public background, read out of the stylesheet', () => {
     // R367: the public pages sit on ink-950. Read from the token, so a change to it
     // cannot leave the browser chrome on the old colour.
-    const css = readFileSync(resolve(packageRoot, 'src/styles.css'), 'utf8')
+    const css = tokenSource()
     const token = css.match(/--color-ink-950:\s*(#[0-9A-Fa-f]{6})\s*;/)?.[1]
     expect(token, 'styles.css no longer declares --color-ink-950 as a hex value').toBeTruthy()
     expect(content(doc, 'meta[name="theme-color"]')).toBe(token)
@@ -188,7 +189,7 @@ describe('the built artifact', () => {
     shared('twitter:card', (d) => content(d, 'meta[name="twitter:card"]'))
     shared('stylesheet', (d) => d.querySelector('link[rel="stylesheet"]')?.getAttribute('href'))
     shared('module script', (d) => d.querySelector('script[type="module"]')?.getAttribute('src'))
-    for (const doc of docs) expect(doc.querySelector('mw-root'), 'the SPA mount point').not.toBeNull()
+    for (const doc of docs) expect(doc.querySelector('tk-root'), 'the SPA mount point').not.toBeNull()
   })
 
   // R412: the bundle is fetched as early as ever, at low priority, so the stylesheet and fonts win a
@@ -212,7 +213,7 @@ describe('the built artifact', () => {
   // is rendered at all, which is what a `ssr: false` revert would silently undo.
   it.each(routes)('ships %s with its body rendered, not an empty mount point', (route) => {
     const doc = parse(readBuilt(fileFor(route)))
-    const root = doc.querySelector('mw-root')
+    const root = doc.querySelector('tk-root')
     expect(root?.getAttribute('ng-server-context'), route).toBe('ssr-analog')
     expect(root?.querySelector('h1')?.textContent?.trim(), route).toBeTruthy()
   })

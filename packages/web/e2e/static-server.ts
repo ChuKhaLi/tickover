@@ -73,7 +73,7 @@ const TYPES: Record<string, string> = {
 /**
  * A type for every extension the build emits. Guessing from the bytes would be
  * worse than the fallback: Chromium refuses to execute a module script that is not
- * served as JavaScript, and the page then renders as an empty `<mw-root>` with one
+ * served as JavaScript, and the page then renders as an empty `<tk-root>` with one
  * console line — indistinguishable from the app being broken.
  */
 export function contentTypeFor(file: string): string {

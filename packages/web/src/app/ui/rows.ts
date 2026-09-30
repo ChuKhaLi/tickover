@@ -21,8 +21,8 @@ import { Directive } from '@angular/core'
  *
  * **The head's alignment is scoped, and that is a bug fix rather than a nicety.** It
  * was `[&_th]:text-left`, which is a descendant selector and therefore outranks the
- * plain `text-right` that `mw-figure` puts on the element -- so a figure column's
- * header sat over the wrong edge of its own column while `mw-figure` was present and
+ * plain `text-right` that `tk-figure` puts on the element -- so a figure column's
+ * header sat over the wrong edge of its own column while `tk-figure` was present and
  * correct on it. `layout.spec.ts` asserted the class was there, which it was, and a
  * class-presence test cannot see specificity. Found by reading the built page.
  *
@@ -31,10 +31,10 @@ import { Directive } from '@angular/core'
  * as one string.
  */
 @Directive({
-  selector: 'table[mw-rows]',
+  selector: 'table[tk-rows]',
   host: {
     class:
-      'w-full text-small [&_thead]:text-caption [&_thead]:text-ink-600 dark:[&_thead]:text-ink-400 [&_th]:py-2 [&_th:not([mw-figure])]:text-left [&_td]:py-2 [&_th:not(:last-child)]:pr-4 [&_td:not(:last-child)]:pr-4 [&_tbody_tr]:border-t [&_tbody_tr]:border-ink-200 dark:[&_tbody_tr]:border-ink-700',
+      'w-full text-small [&_thead]:text-caption [&_thead]:text-ink-600 dark:[&_thead]:text-ink-400 [&_th]:py-2 [&_th:not([tk-figure])]:text-left [&_td]:py-2 [&_th:not(:last-child)]:pr-4 [&_td:not(:last-child)]:pr-4 [&_tbody_tr]:border-t [&_tbody_tr]:border-ink-200 dark:[&_tbody_tr]:border-ink-700',
   },
 })
 export class Rows {}
@@ -42,11 +42,11 @@ export class Rows {}
 /**
  * A cell holding a figure. Right-aligned and tabular, which is the pair design
  * system 4 asks for wherever a number has to line up with the number below it --
- * and the reason `mw-money`'s `data` voice exists. Put it on the `<th>` too, or the
+ * and the reason `tk-money`'s `data` voice exists. Put it on the `<th>` too, or the
  * column head sits over the wrong edge of its own column.
  */
 @Directive({
-  selector: '[mw-figure]',
+  selector: '[tk-figure]',
   host: { class: 'text-right tabular-nums' },
 })
 export class Figure {}

@@ -2,7 +2,7 @@ import type { Type } from '@angular/core'
 import { TestBed } from '@angular/core/testing'
 import { provideRouter } from '@angular/router'
 import { describe, it, expect } from 'vitest'
-import { CREDIT_PACK_CENTS, PRICING, RULES, SITE, quoteStudy } from '@tickover/contract'
+import { PRICING, RULES, SITE, quoteStudy } from '@tickover/contract'
 import PrivacyPage from './privacy.page'
 import DevelopersPage from './developers.page'
 import DeveloperTermsPage from './terms/developers.page'
@@ -42,6 +42,47 @@ function textOf<T>(page: Type<T>): string {
   const fixture = TestBed.createComponent(page)
   fixture.detectChanges()
   return ((fixture.nativeElement as HTMLElement).textContent ?? '').replace(/\s+/g, ' ')
+}
+
+function normalize(text: string | null | undefined): string {
+  return (text ?? '').replace(/\s+/g, ' ').trim()
+}
+
+function elementOf<T>(page: Type<T>): HTMLElement {
+  TestBed.resetTestingModule()
+  TestBed.configureTestingModule({ providers: [provideRouter([])] })
+  const fixture = TestBed.createComponent(page)
+  fixture.detectChanges()
+  return fixture.nativeElement as HTMLElement
+}
+
+/** The whole rendered text of the buyer terms page — for a negative claim, which needs the
+ * whole page rather than one section, since it says a word appears nowhere on it. */
+function pageText(): string {
+  return textOf(BuyerTermsPage)
+}
+
+/** The paragraph immediately after the heading `headingSelector` names, on the buyer terms
+ * page. Scoped to that one element (R99), rather than the whole page, because the claim is
+ * about what that paragraph says. */
+function paragraphAfter(headingSelector: string): string {
+  const heading = elementOf(BuyerTermsPage).querySelector(headingSelector)
+  expect(heading, `no heading matching ${headingSelector}`).not.toBeNull()
+  return normalize(heading!.nextElementSibling?.textContent)
+}
+
+/** Every sibling between the heading `headingSelector` names and the next h2, on the buyer
+ * terms page — the section that heading owns. */
+function sectionText(headingSelector: string): string {
+  const heading = elementOf(BuyerTermsPage).querySelector(headingSelector)
+  expect(heading, `no heading matching ${headingSelector}`).not.toBeNull()
+  const parts: string[] = []
+  let node = heading!.nextElementSibling
+  while (node && node.tagName !== 'H2') {
+    parts.push(node.textContent ?? '')
+    node = node.nextElementSibling
+  }
+  return normalize(parts.join(' '))
 }
 
 describe('the privacy page', () => {
@@ -105,13 +146,31 @@ describe('the privacy page', () => {
     }
   })
 
+  // R505/R508: PayPal is now a buyer payment option, not only a payout method, and
+  // this is the entry it belongs to -- scoped to the entry itself (R99), so a claim
+  // that is true only because the developer-payout bullet also says "PayPal" cannot
+  // pass this test by accident.
+  it('names PayPal in the Payments entry as a processor the buyer can choose', () => {
+    const li = elementOf(PrivacyPage).querySelector('[data-privacy="payments"]')
+    expect(li, 'no Payments entry with data-privacy="payments"').not.toBeNull()
+    const text = normalize(li!.textContent)
+    expect(text).toContain('PayPal')
+    expect(text, 'the entry does not say what PayPal receives').toContain('name, email address and payment details')
+    expect(text, 'the entry does not say what we receive back').toContain('payment reference and amount')
+  })
+
   it('names the operator, the processors and a way to reach a person', () => {
     const text = textOf(PrivacyPage)
     expect(text).toContain('hello@tickover.dev')
     expect(text).toContain('Vietnam')
-    for (const processor of ['GitHub', 'Paddle', 'PayPal']) {
+    for (const processor of ['GitHub', 'PayPal']) {
       expect(text, `${processor} handles personal data and is not named`).toContain(processor)
     }
+    // R500: no merchant of record any more.
+    expect(text, 'the privacy page still names a payment provider').not.toContain('Paddle')
+    // R505: PayPal is the way to pay; bank transfer is not offered.
+    expect(text, 'the privacy page does not say how buyers pay').toContain('buyers pay by PayPal')
+    expect(text, 'the privacy page still offers bank transfer').not.toContain('bank transfer')
   })
 })
 
@@ -299,37 +358,22 @@ describe('the buyer terms', () => {
     expect(text).toContain(`${PRICING.MIN_RESPONDENTS} to ${PRICING.MAX_RESPONDENTS}`)
   })
 
-  // Paddle is the merchant of record, which is not a detail: it is who the buyer's
-  // contract for payment is actually with, and who refunds come from.
-  it('names the merchant of record and what a rejection refunds', () => {
-    const text = textOf(BuyerTermsPage)
-    expect(text).toContain('Paddle')
-    expect(text).toContain('merchant of record')
-    expect(text, 'a rejected study looks like a lost payment').toContain('credit is returned')
+  // R500: a study is paid by invoice, not through a merchant of record, and there is no
+  // payment provider left to name.
+  it('describes paying per study by PayPal, and names no merchant of record', () => {
+    const payment = paragraphAfter('#payment')
+    expect(payment).toContain('paid by PayPal before review starts')
+    expect(payment, 'bank transfer is not offered').not.toContain('bank transfer')
+    expect(pageText()).not.toContain('Paddle')
   })
 
-  // R417. Paddle's domain review asks for a refund policy reachable from the navigation, and the
-  // old Payment paragraph said credit was "not exchangeable for cash" -- which the policy below
-  // now contradicts, so the sentence has to go rather than sit beside it.
-  it('states the refund policy in its own section, anchored for the footer link', () => {
-    TestBed.resetTestingModule()
-    TestBed.configureTestingModule({ providers: [provideRouter([])] })
-    const fixture = TestBed.createComponent(BuyerTermsPage)
-    fixture.detectChanges()
-    const el = fixture.nativeElement as HTMLElement
-    const heading = el.querySelector('h2#refunds')
-    expect(heading, 'no h2#refunds for the footer to point at').not.toBeNull()
-    const text = textOf(BuyerTermsPage)
-    expect(text).toContain('Unused credit is refunded to your original payment method on request within 14 days of purchase.')
-    expect(text).toContain('Credit spent on a study that has started collecting responses is not refundable')
-    expect(text).not.toContain('not exchangeable for cash')
-  })
-
-  // R417: Paddle compares the site's pricing with its catalogue, which sells credit in packs. The
-  // pack sizes come from the contract, like every other figure on these pages (R58).
-  it('names the credit packs from the contract', () => {
-    const text = textOf(BuyerTermsPage)
-    for (const cents of CREDIT_PACK_CENTS) expect(text, formatCents(cents)).toContain(formatCents(cents))
+  // R500: a rejected study is never charged in the first place, so there is nothing to
+  // return -- the promise the old "credit is returned" line made about a refund does not
+  // apply once payment happens before review, not after it.
+  it('promises no charge for a rejected study and refunds of unused credit on request', () => {
+    const refunds = sectionText('#refunds')
+    expect(refunds).toContain('A rejected study is never charged')
+    expect(refunds).toContain('Unused credit is refunded on request')
   })
 })
 
@@ -373,7 +417,7 @@ describe('the three legal pages', () => {
   })
 
   // A legal page nobody can find is not a legal minimum. The footer is on every
-  // public page through `mw-shell`, which is the only place all three can be
+  // public page through `tk-shell`, which is the only place all three can be
   // reached from without knowing the URL.
   it.each([
     ['privacy', PrivacyPage],

@@ -22,14 +22,14 @@ export const routeMeta = { title: `${SITE_NAME} — Not answering` } satisfies R
 @Component({
   imports: [Shell, RouterLink, Link],
   template: `
-    <mw-shell [links]="[{ href: '/developers', label: 'For developers' }, { href: '/buyers', label: 'For buyers' }]">
+    <tk-shell [links]="[{ href: '/developers', label: 'For developers' }, { href: '/buyers', label: 'For buyers' }]">
       <h1 class="text-h1-public text-ink-900 dark:text-ink-50">Tickover is not answering</h1>
       <p class="mt-3 max-w-[68ch]">That page needs the Tickover service, and it did not respond. This is our side, not yours: you have not been signed out, and nothing you had entered has been sent anywhere.</p>
       @if (retry(); as target) {
-        <p class="mt-4"><a mw-link [routerLink]="target">Try that page again</a></p>
+        <p class="mt-4"><a tk-link [routerLink]="target">Try that page again</a></p>
       }
       <p class="mt-4 text-small text-ink-600 dark:text-ink-400">If it keeps happening, email hello&#64;tickover.dev.</p>
-    </mw-shell>`,
+    </tk-shell>`,
 })
 export default class ErrorPage {
   private readonly router = inject(Router)

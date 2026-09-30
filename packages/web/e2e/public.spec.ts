@@ -11,6 +11,7 @@
 import { expect, test } from '@playwright/test'
 import { PRICING, formatStatusLine, quoteStudy, resolveColumns } from '@tickover/contract'
 import { HERO_STUDY } from '../src/app/lib/hero-study'
+import { PROMPT } from '../src/app/lib/hero-timeline'
 import { formatCents } from '../src/app/lib/money'
 import { PAGE_META, SITE_URL } from '../src/app/lib/page-meta'
 import { AGGREGATE_QUESTION, mockApi } from './mock-api'
@@ -158,6 +159,10 @@ test('the hero width dragged before the page hydrates keeps the width it was dra
   await expect(slider).not.toHaveAttribute('jsaction')
   await expect(slider).toHaveValue('100')
   await expect(page.getByText('100 columns')).toBeVisible()
+
+  await expect(page.locator('tk-pane [data-line]')).toContainText(HERO_STUDY.sponsor)
+  await page.waitForTimeout(3000)
+  await expect(page.locator('[data-typed]'), 'the sequence started over a drag').toHaveText('')
 })
 
 test('a buyer lands, takes the buyer card, and reads the price table', async ({ page }) => {
@@ -275,10 +280,10 @@ test('the hero replica is a real composed line, and the width ladder is real', a
   await mockApi(page)
   await page.goto('/')
 
-  await expect(page.locator('mw-pane')).toBeVisible()
+  await expect(page.locator('tk-pane')).toBeVisible()
   // The row, not the whole replica: since R318 the surface also holds the session
   // above the line, and every claim below is about what the composer returned.
-  const pane = page.locator('mw-pane [data-line]')
+  const pane = page.locator('tk-pane [data-line]')
   // What the developer is paid for this study, which is what the line prints.
   const payoutCents = quoteStudy({ targeted: false, atCost: false }).developerCents
 
@@ -324,7 +329,7 @@ test('the hero replica is a real composed line, and the width ladder is real', a
    *
    * So the floor is asked of the composer, for the study the page actually holds, and
    * what is asserted in the browser is that the replica agrees with it. That is also
-   * the claim worth making: R358 was not a wrong number, it was `mw-pane` resolving
+   * the claim worth making: R358 was not a wrong number, it was `tk-pane` resolving
    * width differently from the daemon, and this goes red the moment it does so again.
    */
   const showsQuestion = (cols: number) =>
@@ -385,8 +390,8 @@ test('the hero replica is a real composed line, and the width ladder is real', a
    */
   await slider.fill(String(maxCols))
   const fits = await page.evaluate(() => {
-    const frame = document.querySelector('mw-pane > div') as HTMLElement
-    const row = document.querySelector('mw-pane [data-line]') as HTMLElement
+    const frame = document.querySelector('tk-pane > div') as HTMLElement
+    const row = document.querySelector('tk-pane [data-line]') as HTMLElement
     return { shown: frame.clientWidth, needed: row.scrollWidth }
   })
   expect(fits.needed, `at the slider's maximum the frame is ${fits.shown}px and the line needs ${fits.needed}px`)
@@ -401,8 +406,8 @@ test('the hero replica is a real composed line, and the width ladder is real', a
    */
   await page.setViewportSize({ width: 900, height: 900 })
   const cramped = await page.evaluate(() => {
-    const frame = document.querySelector('mw-pane > div') as HTMLElement
-    const row = document.querySelector('mw-pane [data-line]') as HTMLElement
+    const frame = document.querySelector('tk-pane > div') as HTMLElement
+    const row = document.querySelector('tk-pane [data-line]') as HTMLElement
     return { scrolls: row.scrollWidth > frame.clientWidth + 1, page: document.documentElement.scrollWidth <= document.documentElement.clientWidth }
   })
   expect(cramped.scrolls, 'a 900px viewport cannot hold 120 columns, so the frame must scroll').toBe(true)
@@ -431,13 +436,13 @@ test('the replica is shown inside a terminal, textured with the character cell',
   await mockApi(page)
   await page.goto('/')
 
-  const session = page.locator('mw-pane [data-session]')
+  const session = page.locator('tk-pane [data-session]')
   await expect(session, 'the session above the line is what makes the row legible').toBeVisible()
   await expect(session).toContainText('~/projects/acme')
-  await expect(page.locator('mw-pane')).toContainText('refactor the auth module')
+  await expect(page.locator('tk-pane')).toContainText('refactor the auth module')
 
   // role=img replaces the subtree for a screen reader, so the label carries all of it.
-  const label = await page.locator('mw-pane').getAttribute('aria-label')
+  const label = await page.locator('tk-pane').getAttribute('aria-label')
   expect(label, 'the label still describes only the last row').toContain('A terminal where')
   expect(label).toContain('columns')
 
@@ -482,7 +487,7 @@ test('the replica is shown inside a terminal, textured with the character cell',
  *   keyed on `class="..."` never saw it. 208 characters at 12px, on all twenty.
  * - `/admin`'s policy line reads `Refuse a study for {{ policy.join(', ') }}`. The
  *   literal is 55 characters and the render is 155; source cannot know that.
- * - `mw-empty`'s sentence is an *input*. The prose is at the call site and the
+ * - `tk-empty`'s sentence is an *input*. The prose is at the call site and the
  *   element is in the primitive, and neither half looks long on its own.
  *
  * Measure is a rendered property -- it is a function of font size and container
@@ -525,7 +530,315 @@ test('reduced motion gets the final frame rather than a faster sequence', async 
 
   // Beat 4 is idle with the counters already moved. Asserted immediately, with no
   // wait: if the sequence were merely sped up, this would still be beat 1.
-  await expect(page.locator('mw-pane')).toContainText('today 4/', { timeout: 2000 })
+  await expect(page.locator('tk-pane')).toContainText('today 4/', { timeout: 2000 })
+
+  await expect(page.locator('[data-replay]'), 'no control where there is no motion').toBeHidden()
+  await expect(page.locator('[data-typed]')).toHaveText('')
+})
+
+/**
+ * The sequence, watched where it runs (R384). Real time rather than `page.clock`: hydration itself
+ * rides on timers, and a faked clock would be testing a page that never finished waking up.
+ */
+const heroRow = (page: import('@playwright/test').Page) => page.locator('tk-pane [data-line]')
+
+test('the hero plays its session once, and the pane never changes height', async ({ page }) => {
+  await mockApi(page)
+  await page.goto('/')
+  // Every height the pane takes from here on, by the browser's own account.
+  await page.evaluate(() => {
+    const w = window as unknown as { __heights: number[] }
+    w.__heights = []
+    new ResizeObserver((es) => es.forEach((e) => w.__heights.push(Math.round(e.contentRect.height))))
+      .observe(document.querySelector('tk-pane')!)
+  })
+
+  await expect(page.locator('[data-typed]')).toContainText(PROMPT.slice(0, 10), { timeout: 5000 })
+  await expect(heroRow(page)).toContainText(HERO_STUDY.sponsor, { timeout: 8000 })
+  await expect(heroRow(page)).toContainText('✓', { timeout: 5000 })
+  await expect(heroRow(page)).toContainText('today 4/', { timeout: 5000 })
+  await expect(heroRow(page)).not.toContainText('✓')
+  await expect(page.locator('[data-replay]')).toHaveText('Replay')
+
+  const heights = await page.evaluate(() => (window as unknown as { __heights: number[] }).__heights)
+  expect(heights.length, 'the observer saw the pane at all').toBeGreaterThan(0)
+  expect([...new Set(heights)], 'the pane changed height during the sequence').toHaveLength(1)
+})
+
+/**
+ * The channel the bug travels on (task 6's finding, fix round 1): the Layout Instability API
+ * itself, not a bounding-box sample taken between arbitrary waits -- that is how Lighthouse's own
+ * CLS score is built, and `cls-culprits-insight` named the caret span by watching this.
+ *
+ * Only what the sequence does is counted (final review I3). The self-hosted faces swap in with
+ * `font-display: swap`, and that swap is a real shift of the slider, the price table and the footer
+ * that the sequence did not cause. The window used to open at navigation, so a late swap counted
+ * (1 of 5 full runs; 1.3e-4 in a run with font responses held 1200ms). `document.fonts.ready` on
+ * its own is not the answer either: awaited after `goto` it resolved 3-7ms *after* the swap's own
+ * entry (fonts held 300/1200/3000ms). The window opens two frames after it instead, at `t0`, and
+ * only entries starting at or after `t0` count. So that the whole sequence -- frame 0 and the first
+ * characters typed -- still falls inside it, the page is served with the band pushed below the
+ * fold, where the player never starts, and the pane is scrolled in only once `t0` is taken. A
+ * scroll is not a shift, and nothing here is input, so `hadRecentInput` excludes nothing that
+ * matters.
+ *
+ * 518px is where the control's label used to move the page (final review I1): the row it sits in
+ * wrapped with "Replay" or "Pause" and fit one line with "Play", and the lead paragraph under it
+ * moved 32px each time the label changed. Measured there before the fix: 0.256.
+ */
+async function sequenceShift(page: import('@playwright/test').Page, width: number) {
+  await mockApi(page)
+  await page.setViewportSize({ width, height: 900 })
+  await page.route((url) => url.pathname === '/', async (route) => {
+    const served = await route.fetch()
+    const body = (await served.text()).replace('</head>', '<style>body{padding-top:3000px}</style></head>')
+    await route.fulfill({ response: served, body })
+  })
+  await page.goto('/')
+  // Hydrated (the control is only shown once motion is allowed), and still the final frame.
+  await expect(page.locator('[data-replay]')).toBeVisible()
+  await expect(page.locator('[data-typed]')).toHaveText('')
+
+  await page.evaluate(async () => {
+    await document.fonts.ready
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+    const w = window as unknown as {
+      __t0: number
+      __shifts: { start: number; value: number; sources: string[] }[]
+      __shiftObserver: PerformanceObserver
+    }
+    w.__t0 = performance.now()
+    w.__shifts = []
+    const describe = (n: Node | null | undefined): string => {
+      if (!n) return '(detached node)'
+      if (!(n instanceof Element)) return n.nodeName
+      const cls = n.className ? `.${String(n.className).trim().replace(/\s+/g, '.')}` : ''
+      return `${n.tagName.toLowerCase()}${cls}`
+    }
+    const record = (entries: PerformanceEntryList) => {
+      for (const entry of entries) {
+        const e = entry as unknown as { startTime: number; value: number; hadRecentInput: boolean; sources?: { node?: Node }[] }
+        if (e.hadRecentInput || e.startTime < w.__t0) continue
+        w.__shifts.push({ start: e.startTime, value: e.value, sources: (e.sources ?? []).map((s) => describe(s.node)) })
+      }
+    }
+    w.__shiftObserver = new PerformanceObserver((list) => record(list.getEntries()))
+    w.__shiftObserver.observe({ type: 'layout-shift', buffered: true })
+    // Last, so the whole sequence plays inside the window.
+    document.querySelector('tk-pane')!.scrollIntoView({ block: 'start' })
+  })
+
+  // Through the whole sequence: typing, submit, tool lines, spinner, the row's wash and credited
+  // flash, back to idle -- the control reads Pause as it starts and Replay once it has ended.
+  await expect(page.locator('[data-typed]')).not.toHaveText('', { timeout: 5000 })
+  await expect(page.locator('[data-replay]')).toHaveText('Replay', { timeout: 15000 })
+  // Two frames for the last change to be laid out, then whatever the observer has not yet delivered.
+  return page.evaluate(async () => {
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+    const w = window as unknown as {
+      __shifts: { start: number; value: number; sources: string[] }[]
+      __shiftObserver: PerformanceObserver
+      __t0: number
+    }
+    for (const entry of w.__shiftObserver.takeRecords()) {
+      const e = entry as unknown as { startTime: number; value: number; hadRecentInput: boolean }
+      if (!e.hadRecentInput && e.startTime >= w.__t0) w.__shifts.push({ start: e.startTime, value: e.value, sources: ['(late record)'] })
+    }
+    return w.__shifts
+  })
+}
+
+for (const width of [1280, 518]) {
+  test(`the hero sequence causes zero layout shift at ${width}px`, async ({ page }) => {
+    const shifts = await sequenceShift(page, width)
+    const total = shifts.reduce((sum, s) => sum + s.value, 0)
+    const sources = [...new Set(shifts.flatMap((s) => s.sources))]
+    expect(total, `layout-shift sources: ${sources.join(', ') || '(none)'}`).toBe(0)
+  })
+}
+
+/**
+ * The control's width does not depend on what it says (final review I1). It sits in a row that
+ * wraps, so a label one word wider can push the row to a second line; measured before the fix, at
+ * 513-528px the row was 68px with "Replay" or "Pause" and 36px with "Play", and the label changes
+ * on its own twice (hydration, and the sequence starting). Each label is reached the way a visitor
+ * reaches it rather than written into the DOM, and the row is measured at every width in each.
+ */
+test('the control row is the same height whatever the control reads', async ({ page }) => {
+  await mockApi(page)
+  await page.goto('/')
+  const control = page.locator('[data-replay]')
+  const widths = [375, ...Array.from({ length: 41 }, (_, i) => 480 + i * 2), 1280]
+  const sweep = async (expected: string) => {
+    const out: Record<number, number> = {}
+    for (const width of widths) {
+      await page.setViewportSize({ width, height: 900 })
+      const seen = await page.evaluate(() => {
+        const button = document.querySelector('[data-replay]')!
+        return { label: button.textContent!.trim(), row: button.closest('p')!.getBoundingClientRect().height }
+      })
+      expect(seen.label, `the control changed label mid-sweep, at ${width}px`).toBe(expected)
+      out[width] = seen.row
+    }
+    return out
+  }
+
+  await expect(control).toHaveText('Pause', { timeout: 5000 })
+  await control.click()
+  await expect(control).toHaveText('Play')
+  const play = await sweep('Play')
+  await control.click()
+  await expect(control).toHaveText('Pause')
+  const pause = await sweep('Pause')
+  await expect(control).toHaveText('Replay', { timeout: 15000 })
+  const replay = await sweep('Replay')
+
+  const differ = widths
+    .filter((w) => play[w] !== pause[w] || play[w] !== replay[w])
+    .map((w) => `${w}px: Play ${play[w]}, Pause ${pause[w]}, Replay ${replay[w]}`)
+  expect(differ, 'widths where the row height follows the label').toEqual([])
+})
+
+/**
+ * Where the caret sits (fix round 2, re-review finding): `.tk-caret` is positioned against the
+ * prompt box's own padding edge, and the box carries `px-2 py-1` and a border the caret's anchor
+ * did not account for, so it rendered about 8px short of the typed text and 5px high enough to
+ * cover the last character rather than sit after it. Measured against `[data-typed]`'s own
+ * rendered edge rather than against a hand-copied padding figure, so a future padding change on
+ * the box cannot silently reopen this without also moving the number this test compares against.
+ * Top-aligned with the typed span (not vertically centred): both are plain inline text on one
+ * line, so their line boxes already start at the same y once the caret's anchor is right.
+ */
+async function caretOffset(page: import('@playwright/test').Page): Promise<{ dx: number; dy: number }> {
+  return page.evaluate(() => {
+    const typed = document.querySelector('[data-typed]')!.getBoundingClientRect()
+    const caret = document.querySelector('[data-caret]')!.getBoundingClientRect()
+    return { dx: caret.left - typed.right, dy: caret.top - typed.top }
+  })
+}
+
+test('the caret sits at the end of the typed text, mid-typing and at the final frame', async ({ page }) => {
+  await mockApi(page)
+  await page.goto('/')
+
+  // Paused rather than sampled mid-flight: typing keeps moving between the wait above resolving
+  // and the measurement below running, and an extra character typed in that gap is a whole
+  // ADVANCE_EM off -- Pause freezes `f.typed` so the measurement is of a still target.
+  await expect(page.locator('[data-typed]')).toContainText(PROMPT.slice(0, 10), { timeout: 5000 })
+  await page.locator('[data-replay]').click()
+  await expect(page.locator('[data-replay]')).toHaveText('Play')
+
+  const mid = await caretOffset(page)
+  expect(Math.abs(mid.dx), 'caret left vs typed text right, mid-typing (paused)').toBeLessThanOrEqual(1)
+  expect(Math.abs(mid.dy), 'caret top vs typed text top, mid-typing (paused)').toBeLessThanOrEqual(1)
+
+  await page.locator('[data-replay]').click()
+  await expect(page.locator('[data-replay]')).toHaveText('Replay', { timeout: 15000 })
+
+  const final = await caretOffset(page)
+  expect(Math.abs(final.dx), 'caret left vs typed text right, final frame').toBeLessThanOrEqual(1)
+  expect(Math.abs(final.dy), 'caret top vs typed text top, final frame').toBeLessThanOrEqual(1)
+})
+
+/**
+ * The case the sampled test above reaches only by chance (final review I2: 5 of 24 runs). A space
+ * typed last is still a column in a terminal, and the caret's shift counts it; the typed span has to
+ * keep it too, or the span's edge ends a column short of where the caret is drawn. Pause is clicked
+ * in the same animation frame the typed text is first seen ending in a space, and the attempt is
+ * repeated if a frame's typing landed between the look and the click.
+ */
+test('the caret sits after a trailing space, paused on the frame that typed it', async ({ page }) => {
+  await mockApi(page)
+  await page.goto('/')
+  const control = page.locator('[data-replay]')
+  await expect(control).toHaveText('Pause', { timeout: 5000 })
+
+  let typed = ''
+  for (let attempt = 0; attempt < 6 && !typed.endsWith(' '); attempt++) {
+    const caught = await page.evaluate(() => new Promise<boolean>((done) => {
+      const look = () => {
+        const t = document.querySelector('[data-typed]')!.textContent ?? ''
+        if (t.endsWith(' ')) {
+          document.querySelector<HTMLButtonElement>('[data-replay]')!.click()
+          done(true)
+        } else if (t.length === 0 && document.querySelector('[data-sent]:not(.opacity-0)')) done(false)
+        else requestAnimationFrame(look)
+      }
+      look()
+    }))
+    if (!caught) break
+    await expect(control).toHaveText('Play')
+    typed = (await page.locator('[data-typed]').textContent()) ?? ''
+    if (!typed.endsWith(' ')) {
+      await control.click()
+      await expect(control).toHaveText('Pause')
+    }
+  }
+  expect(typed, 'never paused on a trailing space, so this proved nothing').toMatch(/ $/)
+
+  const { dx, dy } = await caretOffset(page)
+  expect(Math.abs(dx), `caret left vs typed text right, paused after "${typed}"`).toBeLessThanOrEqual(1)
+  expect(Math.abs(dy), 'caret top vs typed text top, paused after a space').toBeLessThanOrEqual(1)
+})
+
+test('the caret sits at the end of the typed text under reduced motion', async ({ page }) => {
+  await mockApi(page)
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.goto('/')
+
+  // The final frame, served at once: nothing typed, so `[data-typed]` is an empty box and the
+  // caret should sit right at its start, which is also its end.
+  await expect(page.locator('[data-typed]')).toHaveText('')
+  const { dx, dy } = await caretOffset(page)
+  expect(Math.abs(dx), 'caret left vs typed text right, reduced motion').toBeLessThanOrEqual(1)
+  expect(Math.abs(dy), 'caret top vs typed text top, reduced motion').toBeLessThanOrEqual(1)
+})
+
+test('the sequence waits until the pane is in view', async ({ page }) => {
+  await mockApi(page)
+  await page.setViewportSize({ width: 1280, height: 220 })
+  await page.goto('/')
+  await page.waitForTimeout(2500)
+  // Still the final frame: nothing typed, the counters already moved.
+  await expect(page.locator('[data-typed]')).toHaveText('')
+  await expect(heroRow(page)).toContainText('today 4/')
+  await page.locator('tk-pane').scrollIntoViewIfNeeded()
+  await expect(page.locator('[data-typed]')).toContainText(PROMPT.slice(0, 10), { timeout: 5000 })
+})
+
+test('Pause stops the clock and Play resumes it', async ({ page }) => {
+  await mockApi(page)
+  await page.goto('/')
+  const spinner = page.locator('[data-spinner]')
+  await expect(spinner).toContainText('(1s)', { timeout: 6000 })
+  await page.locator('[data-replay]').click()
+  await expect(page.locator('[data-replay]')).toHaveText('Play')
+  const held = await spinner.innerText()
+  await page.waitForTimeout(1500)
+  expect(await spinner.innerText(), 'the spinner kept counting while paused').toBe(held)
+  await page.locator('[data-replay]').click()
+  await expect(page.locator('[data-replay]')).toHaveText('Pause')
+  await expect(spinner).not.toHaveText(held, { timeout: 3000 })
+})
+
+test('a drag during the sequence stops it on the question', async ({ page }) => {
+  await mockApi(page)
+  await page.goto('/')
+  await expect(page.locator('[data-typed]')).toContainText(PROMPT.slice(0, 5), { timeout: 5000 })
+  await page.locator('[data-cols]').fill('110')
+  await expect(heroRow(page)).toContainText(HERO_STUDY.sponsor)
+  await expect(page.locator('[data-replay]')).toHaveText('Replay')
+  await page.waitForTimeout(4000)
+  await expect(heroRow(page), 'the sequence carried on over the drag').toContainText(HERO_STUDY.sponsor)
+})
+
+test('Replay plays it again from the start', async ({ page }) => {
+  await mockApi(page)
+  await page.goto('/')
+  await expect(page.locator('[data-replay]')).toHaveText('Replay', { timeout: 15000 })
+  await page.locator('[data-replay]').click()
+  await expect(heroRow(page)).toContainText('today 3/')
+  await expect(heroRow(page)).toContainText(HERO_STUDY.sponsor, { timeout: 8000 })
 })
 
 test('the landing page loads with nothing failing, favicon included', async ({ page }) => {

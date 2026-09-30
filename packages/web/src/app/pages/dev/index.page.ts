@@ -54,28 +54,41 @@ const STATUS_NOTE: Record<HistoryRow['status'], string> = {
   imports: [Money, DatePipe, RouterLink, Async, Banner, Button, Link, PageHeader, Figure, Rows, Stat, RecordList],
   template: `
     @if (auth.developer(); as d) {
-      <mw-page-header heading="Earnings" />
+      <tk-page-header heading="Earnings" />
       <div class="grid gap-4 sm:grid-cols-3">
-        <mw-stat label="Pending" hint="Answered, and held until those studies close.">
-          <mw-money voice="data" [cents]="d.balance_pending_cents" />
-        </mw-stat>
-        <mw-stat label="Available" hint="Cleared, and waiting for the next monthly payout run.">
-          <mw-money voice="data" [cents]="d.balance_available_cents" />
-        </mw-stat>
-        <mw-stat label="Today" hint="Paid answers today. The count starts again at 00:00 UTC.">
+        <tk-stat label="Pending" hint="Answered, and held until those studies close.">
+          <tk-money voice="data" [cents]="d.balance_pending_cents" />
+        </tk-stat>
+        <tk-stat label="Available" hint="Cleared, and waiting for the next monthly payout run.">
+          <tk-money voice="data" [cents]="d.balance_available_cents" />
+        </tk-stat>
+        <tk-stat label="Today" hint="Paid answers today. The count starts again at 00:00 UTC.">
           {{ d.today_paid_answers }} / {{ maxPaid }}
-        </mw-stat>
+        </tk-stat>
       </div>
       <!-- Both figures come from RULES, never typed in (R49): a payout minimum and
            an account-age rule are configuration, and copy that states them as
            literals goes on claiming the old ones after they change. -->
-      <p class="mt-3 max-w-[68ch] text-small text-ink-600 dark:text-ink-400">Paid by PayPal, monthly, once your available balance reaches <mw-money [cents]="payoutMinCents" />.
-        @if (!d.payout_method) { <a mw-link routerLink="/dev/settings">Set your PayPal email in Settings</a>. }
+      <p class="mt-3 max-w-[68ch] text-small text-ink-600 dark:text-ink-400">Paid by PayPal, monthly, once your available balance reaches <tk-money [cents]="payoutMinCents" />.
+        @if (!d.payout_method) { <a tk-link routerLink="/dev/settings">Set your PayPal email in Settings</a>. }
         @if (!d.can_cash_out) { Your GitHub account has to be {{ minAgeMonths }} months old before a first payout; earnings accrue until then. }
       </p>
+      <!-- R515: neither balance above can describe this state -- it left pending when
+           the study closed and left available when the run exported, so a payout
+           PayPal could not deliver reads as zero on both cards unless a notice says
+           where the money actually is. -->
+      <!-- unclaimed_email is the address the money was actually sent to, frozen on the payout
+           row at batch creation -- not payout_method.email, which is whatever address the
+           developer has saved SINCE, and may no longer be where this money is sitting. -->
+      @if (d.unclaimed_cents > 0 && d.unclaimed_email) {
+        <tk-banner data-unclaimed class="mt-3 max-w-[68ch]" tone="info"><tk-money [cents]="d.unclaimed_cents" /> is waiting for you at PayPal under {{ d.unclaimed_email }}. Sign in to PayPal with that address, or create an account with it, within 30 days to receive it.</tk-banner>
+      }
+      @if (d.payout_method_needs_confirm) {
+        <tk-banner data-needs-confirm class="mt-3 max-w-[68ch]" tone="error">PayPal could not deliver your last payout, so the money is back in your balance. <a tk-link routerLink="/dev/settings">Check your PayPal email and save it again</a> to receive the next run.</tk-banner>
+      }
 
       <h2 class="mt-8 text-h2 text-ink-900 dark:text-ink-50">History</h2>
-      <mw-async
+      <tk-async
         class="mt-2"
         [failed]="failed()"
         [loading]="loading()"
@@ -83,8 +96,8 @@ const STATUS_NOTE: Record<HistoryRow['status'], string> = {
         failedSays="Couldn't load your history. Reload the page to try again."
         emptySays="No answers yet. Answer a question in your status line and it shows up here."
       >
-        <table mw-rows>
-          <thead><tr><th>When</th><th>Sponsor</th><th>Study</th><th mw-figure>Amount</th><th>Status</th></tr></thead>
+        <table tk-rows>
+          <thead><tr><th>When</th><th>Sponsor</th><th>Study</th><th tk-figure>Amount</th><th>Status</th></tr></thead>
           <tbody>
             <!-- Keyed by position, not by content. Two answers can share a
                  millisecond -- that collision is the whole reason R36 made the cursor
@@ -99,25 +112,25 @@ const STATUS_NOTE: Record<HistoryRow['status'], string> = {
                      to the line this product sells and to nothing else, and a cell with two
                      things in it is what a parenthesis is for. -->
                 <td>{{ r.study_title }}@if (r.kind === 'profile') { <span class="text-ink-600 dark:text-ink-400"> (profile question)</span> }</td>
-                <td mw-figure><mw-money voice="data" [cents]="r.cents" /></td>
+                <td tk-figure><tk-money voice="data" [cents]="r.cents" /></td>
                 <td>{{ r.status }}</td>
               </tr>
             }
           </tbody>
         </table>
         @if (cursor()) {
-          <button type="button" mw-button variant="secondary" size="sm" data-more class="mt-3" [disabled]="busy()" (click)="more()">Load more</button>
+          <button type="button" tk-button variant="secondary" size="sm" data-more class="mt-3" [disabled]="busy()" (click)="more()">Load more</button>
         }
-        @if (moreFailed()) { <mw-banner class="mt-2" tone="error">Couldn't load the next page. Try again.</mw-banner> }
+        @if (moreFailed()) { <tk-banner class="mt-2" tone="error">Couldn't load the next page. Try again.</tk-banner> }
         <!-- A record, not a list joined by an em dash. The dash was a mark doing the
              work a column should do, which is the same mistake the middle dot was
              making one primitive over; and this is the most-read prose on the page,
              because it is where a developer finds out why money they are owed left a
              balance days before it arrived. -->
-        <dl mw-record data-statuses class="mt-6 max-w-[68ch]">
+        <dl tk-record data-statuses class="mt-6 max-w-[68ch]">
           @for (s of statuses; track s) { <dt [attr.data-status]="s">{{ s }}</dt><dd>{{ note(s) }}</dd> }
         </dl>
-      </mw-async>
+      </tk-async>
     }`,
 })
 export default class EarningsPage {

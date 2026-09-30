@@ -43,6 +43,23 @@ export const PayoutBatchView = z.object({
   // the claim only matches rows still `exported`. Nullable rather than optional:
   // "this batch has not failed" is a fact worth stating, not an absence.
   failed_at: z.string().datetime().nullable(),
+  // PayPal Payouts (spec 2026-09-28). Defaults so an older server's answer still parses (R504).
+  status_counts: z.object({
+    exported: z.number().int(), sent: z.number().int(), unclaimed: z.number().int(),
+    paid: z.number().int(), failed: z.number().int(), reversed: z.number().int(),
+  }).default({ exported: 0, sent: 0, unclaimed: 0, paid: 0, failed: 0, reversed: 0 }),
+  sent_at: z.string().datetime().nullable().default(null),
+  provider_batch_id: z.string().nullable().default(null),
+  fees_cents: z.number().int().nullable().default(null),
+  // Sent and PayPal gave us its batch id. Sent but not confirmed means Send again (R514).
+  confirmed: z.boolean().default(false),
+  // Decided by the server, the only side that knows whether PAYPAL_PAYOUTS is on (R517).
+  sendable: z.boolean().default(false),
+  refreshable: z.boolean().default(false),
+  problems: z.array(z.object({
+    payout_id: z.string(), github_login: z.string(), cents: z.number().int(),
+    status: z.enum(['failed', 'reversed']), reason: z.string().nullable(),
+  })).default([]),
 })
 
 /**

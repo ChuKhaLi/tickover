@@ -3,7 +3,7 @@ import { FormsModule } from '@angular/forms'
 import { Router, RouterLink } from '@angular/router'
 import type { RouteMeta } from '@analogjs/router'
 import { LANGUAGES, PRICING, RULES, type AudienceEstimate, type StudyView } from '@tickover/contract'
-import { ApiService, ApiError, newIdempotencyKey } from '../../../lib/api'
+import { ApiService, newIdempotencyKey } from '../../../lib/api'
 import { AuthState, buyerGuard } from '../../../lib/auth'
 import { SITE_NAME } from '../../../lib/page-meta'
 import {
@@ -34,7 +34,7 @@ export const ESTIMATE_DEBOUNCE_MS = 400
 @Component({
   imports: [FormsModule, RouterLink, Banner, Button, Card, Chip, Field, Input, Link, Meta, Money, PageHeader, Range],
   template: `
-    <mw-page-header heading="New study" />
+    <tk-page-header heading="New study" />
     <form class="grid gap-8 lg:grid-cols-[1fr_20rem]" (ngSubmit)="submitForReview()">
       <!-- Locked once a study exists, and it has to be: the size, the targeting
            and the questions are settled at creation, so an edit made here can never
@@ -45,41 +45,41 @@ export const ESTIMATE_DEBOUNCE_MS = 400
       <div class="space-y-8">
       <fieldset class="space-y-8" [disabled]="locked()">
         <section class="space-y-4">
-          <mw-field label="Title (internal)">
-            <input mw-input name="title" [(ngModel)]="draft.title" [attr.maxlength]="titleMax" />
-          </mw-field>
-          <mw-field label="Sponsor name shown to developers" hint="Shown in the status line with every question.">
-            <input mw-input name="sponsor" [(ngModel)]="draft.sponsor" [attr.maxlength]="sponsorMax" />
-          </mw-field>
+          <tk-field label="Title (internal)">
+            <input tk-input name="title" [(ngModel)]="draft.title" [attr.maxlength]="titleMax" />
+          </tk-field>
+          <tk-field label="Sponsor name shown to developers" hint="Shown in the status line with every question.">
+            <input tk-input name="sponsor" [(ngModel)]="draft.sponsor" [attr.maxlength]="sponsorMax" />
+          </tk-field>
         </section>
 
         <section class="space-y-6">
           <h2 class="text-h2 text-ink-900 dark:text-ink-50">Questions ({{ draft.questions.length }} of {{ maxQuestions }})</h2>
           @for (q of draft.questions; track $index; let qi = $index) {
-            <div mw-card pad="lg">
+            <div tk-card pad="lg">
               <!-- The character count is the field's hint, not part of its label.
                    It used to sit inside the label element, which means the
                    control's accessible name changed on every keystroke. -->
-              <mw-field [label]="'Question ' + (qi + 1)" [hint]="q.text.length + ' of ' + maxQ + ' characters'">
-                <input mw-input [name]="'q' + qi" [attr.name]="'q' + qi" [(ngModel)]="q.text" [attr.maxlength]="maxQ" />
-              </mw-field>
+              <tk-field [label]="'Question ' + (qi + 1)" [hint]="q.text.length + ' of ' + maxQ + ' characters'">
+                <input tk-input [name]="'q' + qi" [attr.name]="'q' + qi" [(ngModel)]="q.text" [attr.maxlength]="maxQ" />
+              </tk-field>
               @for (o of q.options; track $index; let oi = $index) {
                 <!-- An accessible name rather than a shown label: up to five rows a
                      question, and a label over each would be five headings for one
                      list. The placeholder keeps its one honest job. -->
                 <div class="mt-2 flex items-center gap-3">
-                  <input mw-input [name]="'q' + qi + 'o' + oi" [attr.name]="'q' + qi + 'o' + oi" [attr.aria-label]="'Option ' + (oi + 1) + ' of question ' + (qi + 1)" [(ngModel)]="q.options[oi]" [attr.maxlength]="maxO" placeholder="Option {{ oi + 1 }}" />
-                  @if (q.options.length > minOptions) { <button type="button" mw-button variant="quiet" size="sm" (click)="removeOption(q, oi)">remove</button> }
+                  <input tk-input [name]="'q' + qi + 'o' + oi" [attr.name]="'q' + qi + 'o' + oi" [attr.aria-label]="'Option ' + (oi + 1) + ' of question ' + (qi + 1)" [(ngModel)]="q.options[oi]" [attr.maxlength]="maxO" placeholder="Option {{ oi + 1 }}" />
+                  @if (q.options.length > minOptions) { <button type="button" tk-button variant="quiet" size="sm" (click)="removeOption(q, oi)">remove</button> }
                 </div>
               }
-              @if (q.options.length < maxOptions) { <button type="button" mw-button variant="quiet" size="sm" class="mt-2" (click)="q.options.push('')">+ option</button> }
-              <mw-field class="mt-4" label="Context shown on rich surfaces (optional)" [hint]="q.context.length + ' of ' + maxC + ' characters'">
-                <textarea mw-input [name]="'c' + qi" [attr.name]="'c' + qi" [(ngModel)]="q.context" [attr.maxlength]="maxC" rows="2"></textarea>
-              </mw-field>
-              @if (draft.questions.length > 1) { <button type="button" mw-button variant="quiet" size="sm" class="mt-3" (click)="draft.questions.splice(qi, 1)">remove question</button> }
+              @if (q.options.length < maxOptions) { <button type="button" tk-button variant="quiet" size="sm" class="mt-2" (click)="q.options.push('')">+ option</button> }
+              <tk-field class="mt-4" label="Context shown on rich surfaces (optional)" [hint]="q.context.length + ' of ' + maxC + ' characters'">
+                <textarea tk-input [name]="'c' + qi" [attr.name]="'c' + qi" [(ngModel)]="q.context" [attr.maxlength]="maxC" rows="2"></textarea>
+              </tk-field>
+              @if (draft.questions.length > 1) { <button type="button" tk-button variant="quiet" size="sm" class="mt-3" (click)="draft.questions.splice(qi, 1)">remove question</button> }
             </div>
           }
-          @if (draft.questions.length < maxQuestions) { <button type="button" mw-button variant="quiet" size="sm" (click)="addQuestion()">+ question</button> }
+          @if (draft.questions.length < maxQuestions) { <button type="button" tk-button variant="quiet" size="sm" (click)="addQuestion()">+ question</button> }
           <!-- The hold is price x questions x respondents, so a second question
                doubles the bill. Saying so beside the button is cheaper than a
                buyer discovering it in the quote. -->
@@ -92,10 +92,10 @@ export const ESTIMATE_DEBOUNCE_MS = 400
                figure below is the difference between this buyer's two quotes
                (R49 -- a price in copy comes from the contract, and from the right
                branch of it). -->
-          <h2 class="text-h2 text-ink-900 dark:text-ink-50">Targeting (+<mw-money [cents]="surcharge()" /> per response)</h2>
+          <h2 class="text-h2 text-ink-900 dark:text-ink-50">Targeting (+<tk-money [cents]="surcharge()" /> per response)</h2>
           <div class="flex flex-wrap gap-2">
             @for (l of languages; track l) {
-              <button type="button" mw-chip [selected]="draft.targeting.languages.includes(l)" (click)="toggleLanguage(l)" [disabled]="!draft.targeting.languages.includes(l) && draft.targeting.languages.length >= caps.languages">{{ l }}</button>
+              <button type="button" tk-chip [selected]="draft.targeting.languages.includes(l)" (click)="toggleLanguage(l)" [disabled]="!draft.targeting.languages.includes(l) && draft.targeting.languages.length >= caps.languages">{{ l }}</button>
             }
           </div>
           <!-- The page offers 23 chips for a field the contract takes 10 of. Left
@@ -105,25 +105,25 @@ export const ESTIMATE_DEBOUNCE_MS = 400
           @if (draft.targeting.languages.length >= caps.languages) {
             <p class="max-w-[68ch] text-small text-ink-600 dark:text-ink-400">{{ draft.targeting.languages.length }} of {{ caps.languages }} languages selected. You can target at most {{ caps.languages }} languages, so deselect one to choose another.</p>
           }
-          <mw-field class="max-w-md" label="Countries (ISO codes, comma separated)" [hint]="countriesOverCap() ? '' : 'At most ' + caps.countries + '.'" [error]="countriesOverCap() ? 'You can target at most ' + caps.countries + ' countries; the rest are ignored.' : ''">
-            <input mw-input name="countries" [ngModel]="countriesText" (ngModelChange)="onCountries($event)" placeholder="US, GB" />
-          </mw-field>
+          <tk-field class="max-w-md" label="Countries (ISO codes, comma separated)" [hint]="countriesOverCap() ? '' : 'At most ' + caps.countries + '.'" [error]="countriesOverCap() ? 'You can target at most ' + caps.countries + ' countries; the rest are ignored.' : ''">
+            <input tk-input name="countries" [ngModel]="countriesText" (ngModelChange)="onCountries($event)" placeholder="US, GB" />
+          </tk-field>
           <div class="flex flex-wrap gap-2">
-            @for (t of tiers; track t) { <button type="button" mw-chip [selected]="draft.targeting.activityTiers.includes(t)" (click)="toggleTier(t)">{{ t }}</button> }
-            @for (o of oses; track o) { <button type="button" mw-chip [selected]="draft.targeting.os.includes(o)" (click)="toggleOs(o)">{{ o }}</button> }
+            @for (t of tiers; track t) { <button type="button" tk-chip [selected]="draft.targeting.activityTiers.includes(t)" (click)="toggleTier(t)">{{ t }}</button> }
+            @for (o of oses; track o) { <button type="button" tk-chip [selected]="draft.targeting.os.includes(o)" (click)="toggleOs(o)">{{ o }}</button> }
           </div>
         </section>
 
         <section>
-          <label class="block max-w-md"><span class="text-small text-ink-600 dark:text-ink-400">Respondents: {{ draft.targetCount }}</span><input name="target" type="range" mw-range [min]="minR" [max]="maxR" step="10" [ngModel]="draft.targetCount" (ngModelChange)="onTargetCount($event)" class="mt-2 w-full" /></label>
+          <label class="block max-w-md"><span class="text-small text-ink-600 dark:text-ink-400">Respondents: {{ draft.targetCount }}</span><input name="target" type="range" tk-range [min]="minR" [max]="maxR" step="10" [ngModel]="draft.targetCount" (ngModelChange)="onTargetCount($event)" class="mt-2 w-full" /></label>
           @if (estimate(); as e) {
-            <p mw-meta class="mt-2"><span>{{ e.reachable_developers }} reachable developers</span><span>{{ e.estimated_fill_hours === null ? 'no estimate yet' : 'about ' + e.estimated_fill_hours + ' hours to fill' }}</span></p>
+            <p tk-meta class="mt-2"><span>{{ e.reachable_developers }} reachable developers</span><span>{{ e.estimated_fill_hours === null ? 'no estimate yet' : 'about ' + e.estimated_fill_hours + ' hours to fill' }}</span></p>
           } @else if (estimateFailed()) {
             <!-- Spec 6.7 puts this figure in front of the buyer before they pay.
                  A panel that just disappears is indistinguishable from the
                  feature not existing, which is the silent failure this branch
                  keeps rediscovering. -->
-            <mw-banner class="mt-2" tone="error">Couldn't work out the reachable audience for this targeting. The study can still be saved and submitted.</mw-banner>
+            <tk-banner class="mt-2" tone="error">Couldn't work out the reachable audience for this targeting. The study can still be saved and submitted.</tk-banner>
           }
         </section>
       </fieldset>
@@ -134,29 +134,29 @@ export const ESTIMATE_DEBOUNCE_MS = 400
              locked in front of a submit button they could never enable. The tick
              is the one control that must survive the lock. (Still no backticks
              in these comments; one ends the template literal.) -->
-        <!-- An ordinary card, where this was an amber panel. mw-banner is the kit's
+        <!-- An ordinary card, where this was an amber panel. tk-banner is the kit's
              amber and it carries role=alert, which is wrong for a standing part of a
              form: it would be announced the moment the page loads, before there is
              anything to react to. And the gate is not the colour -- submit is
              disabled until the box is ticked -- so the tone was decoration, which
              R349 already removed from a more dangerous panel than this one. -->
-        <section mw-card pad="lg">
+        <section tk-card pad="lg">
           <h2 class="text-h3 text-ink-900 dark:text-ink-50">Review policy</h2>
           <label class="mt-3 flex items-start gap-3 text-small"><input type="checkbox" name="policy" [(ngModel)]="policyAccepted" class="mt-0.5 size-4 shrink-0 accent-signal-600 dark:accent-signal-400" /><span>This study does not harvest personal data, is not political or adult content, is not deceptively framed, and is not phrased as feedback about Claude Code or Anthropic. I understand that a person reviews it before it goes live and that the sponsor name is always shown to developers.</span></label>
         </section>
       </div>
 
-      <aside mw-card pad="lg" class="h-fit text-small">
+      <aside tk-card pad="lg" class="h-fit text-small">
         <h2 class="text-h3 text-ink-900 dark:text-ink-50">Quote</h2>
         @if (quote(); as q) {
           <dl class="mt-3 space-y-1">
-            <div class="flex justify-between gap-4"><dt>Per valid response</dt><dd><mw-money voice="data" [cents]="q.priceCents" /></dd></div>
-            <div class="flex justify-between gap-4"><dt>Developer keeps</dt><dd><mw-money voice="data" [cents]="q.developerCents" /></dd></div>
-            <div class="mt-2 flex justify-between gap-4 font-medium"><dt>Hold at submit</dt><dd><mw-money voice="data" [cents]="q.holdCents" /></dd></div>
-            <div class="flex justify-between gap-4 text-ink-600 dark:text-ink-400"><dt>Credits available</dt><dd><mw-money voice="data" [cents]="auth.buyer()?.credit_cents ?? 0" /></dd></div>
+            <div class="flex justify-between gap-4"><dt>Per valid response</dt><dd><tk-money voice="data" [cents]="q.priceCents" /></dd></div>
+            <div class="flex justify-between gap-4"><dt>Developer keeps</dt><dd><tk-money voice="data" [cents]="q.developerCents" /></dd></div>
+            <div class="mt-2 flex justify-between gap-4 font-medium"><dt>Hold at submit</dt><dd><tk-money voice="data" [cents]="q.holdCents" /></dd></div>
+            <div class="flex justify-between gap-4 text-ink-600 dark:text-ink-400"><dt>Credits available</dt><dd><tk-money voice="data" [cents]="auth.buyer()?.credit_cents ?? 0" /></dd></div>
           </dl>
           <!-- A line, not a panel. It was the last filled green in the application,
-               and the tone it wanted -- mw-banner done -- is a live region, which is
+               and the tone it wanted -- tk-banner done -- is a live region, which is
                wrong for a statement that is simply true of this buyer on load. -->
           @if (q.atCost) { <p class="mt-3 text-signal-700 dark:text-signal-300">First study at cost: you pay the developers plus fees, we take $0.</p> }
         }
@@ -165,18 +165,17 @@ export const ESTIMATE_DEBOUNCE_MS = 400
              rather than a promise. -->
         <p class="mt-3 max-w-[68ch] text-small text-ink-600 dark:text-ink-400">Confirmed when the study is submitted; the hold is released for any response that never arrives.</p>
         @if (issues().length) { <ul class="mt-3 list-disc pl-5 text-rejected-fg dark:text-rejected-edge">@for (i of issues(); track i) { <li>{{ i }}</li> }</ul> }
-        @if (needCents(); as n) { <mw-banner class="mt-3" tone="error">You need <mw-money [cents]="n" /> in credits to submit. <a mw-link routerLink="/app/credits">Buy credits</a></mw-banner> }
         <!-- Two failures, two sentences. One string covering both told a buyer
              whose study had been saved that it had not been, and the retry it
              invited created a second paid study. -->
-        @if (createFailed()) { <mw-banner class="mt-3" tone="error">Couldn't save the study, and nothing was created. Try again.</mw-banner> }
-        @if (submitFailed()) { <mw-banner class="mt-3" tone="error">Saved as a draft, but it couldn't be sent for review. Try again.</mw-banner> }
+        @if (createFailed()) { <tk-banner class="mt-3" tone="error">Couldn't save the study, and nothing was created. Try again.</tk-banner> }
+        @if (submitFailed()) { <tk-banner class="mt-3" tone="error">Saved as a draft, but it couldn't be sent for review. Try again.</tk-banner> }
         @if (savedStudy(); as saved) {
-          <p class="mt-3 max-w-[68ch] text-small text-ink-600 dark:text-ink-400">Saved as a draft of {{ saved.questions.length }} question(s) for {{ saved.target_count }} respondents, so the form above is locked and submitting again sends that draft rather than a second study — <a mw-link [routerLink]="['/app/studies', saved.id]">open the saved draft</a>.</p>
+          <p class="mt-3 max-w-[68ch] text-small text-ink-600 dark:text-ink-400">Saved as a draft of {{ saved.questions.length }} question(s) for {{ saved.target_count }} respondents, so the form above is locked and submitting again sends that draft rather than a second study — <a tk-link [routerLink]="['/app/studies', saved.id]">open the saved draft</a>.</p>
         }
         <div class="mt-4 flex flex-col gap-2">
-          <button type="button" mw-button variant="secondary" (click)="saveDraft()" [disabled]="busy()">{{ locked() ? 'Open the saved draft' : 'Save draft' }}</button>
-          <button type="submit" mw-button [disabled]="busy() || !policyAccepted">{{ locked() ? 'Send the saved draft for review' : 'Submit for review' }}</button>
+          <button type="button" tk-button variant="secondary" (click)="saveDraft()" [disabled]="busy()">{{ locked() ? 'Open the saved draft' : 'Save draft' }}</button>
+          <button type="submit" tk-button [disabled]="busy() || !policyAccepted">{{ locked() ? 'Send the saved draft for review' : 'Submit for review' }}</button>
         </div>
       </aside>
     </form>`,
@@ -201,7 +200,6 @@ export default class NewStudyPage {
   caps = TARGETING_CAPS
 
   issues = signal<string[]>([])
-  needCents = signal<number | null>(null)
   createFailed = signal(false)
   submitFailed = signal(false)
   busy = signal(false)
@@ -399,7 +397,6 @@ export default class NewStudyPage {
       return
     }
     this.busy.set(true)
-    this.needCents.set(null)
     this.createFailed.set(false)
     this.submitFailed.set(false)
     try {
@@ -415,22 +412,13 @@ export default class NewStudyPage {
       }
       if (!id) return
       try {
+        // Submit is always a 200 now (R501): a study the balance does not cover
+        // comes back `awaiting_payment` rather than a 402, and the study page --
+        // where the navigation below lands -- is what shows the payment panel.
         await this.api.submitStudy(id)
         await this.router.navigate(['/app/studies', id])
-      } catch (e) {
-        // 402 is the one failure the buyer can act on from here. The study stays
-        // a draft and the at-cost entitlement is not spent (the server rolls the
-        // whole transaction back), so the balance is re-read and they are sent to
-        // buy credits. Submitting again sends the draft above, not a new study.
-        if (e instanceof ApiError && e.status === 402) {
-          const b = e.body as { required_cents: number }
-          this.needCents.set(b.required_cents)
-          // A failure here is "cannot tell what the balance is", not "cannot
-          // submit"; the amount they need is already on screen either way.
-          try { await this.auth.refreshBuyer() } catch { /* keep the known balance */ }
-        } else {
-          this.submitFailed.set(true)
-        }
+      } catch {
+        this.submitFailed.set(true)
       }
     } finally {
       this.busy.set(false)

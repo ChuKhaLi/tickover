@@ -27,16 +27,16 @@ const meta: Meta = {
     props: args,
     template: `
       <div style="max-width:36rem">
-        <mw-async
+        <tk-async
           [failed]="failed"
           [loading]="loading"
           [empty]="empty"
           failedSays="Couldn't load your studies. Reload the page to try again."
           emptySays="No studies yet. Your first one runs at cost."
         >
-          <button mw-empty-action mw-button size="sm">Create a study</button>
+          <button tk-empty-action tk-button size="sm">Create a study</button>
           <p>The data rung: whatever the caller projects.</p>
-        </mw-async>
+        </tk-async>
       </div>`,
   }),
 }
@@ -74,14 +74,14 @@ export const EveryCombination: Story = {
             <p style="font:500 12px/1.4 ui-monospace,monospace; opacity:.6; margin:0 0 6px">
               failed={{ r.failed }} loading={{ r.loading }} empty={{ r.empty }} — {{ r.note }}
             </p>
-            <mw-async
+            <tk-async
               [failed]="r.failed" [loading]="r.loading" [empty]="r.empty"
               failedSays="Couldn't load your studies. Reload the page to try again."
               emptySays="No studies yet. Your first one runs at cost."
             >
-              <button mw-empty-action mw-button size="sm">Create a study</button>
+              <button tk-empty-action tk-button size="sm">Create a study</button>
               <p>Three studies.</p>
-            </mw-async>
+            </tk-async>
           </div>
         }
       </div>`,

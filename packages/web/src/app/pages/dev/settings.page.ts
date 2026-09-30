@@ -25,23 +25,37 @@ const BLANK = '—'
 @Component({
   imports: [Money, DatePipe, FormsModule, Banner, Button, Card, Field, Input, PageHeader, RecordList],
   template: `
-    <mw-page-header heading="Settings" />
+    <tk-page-header heading="Settings" />
 
     <section class="">
       <h2 class="text-h2 text-ink-900 dark:text-ink-50">Payout</h2>
-      <p class="mt-1 text-small text-ink-600 dark:text-ink-400">Paid by PayPal, monthly, once your available balance reaches <mw-money [cents]="payoutMinCents" />.</p>
+      <p class="mt-1 text-small text-ink-600 dark:text-ink-400">Paid by PayPal, monthly, once your available balance reaches <tk-money [cents]="payoutMinCents" />.</p>
+      <!-- R515, same two notices as the earnings page. This one has no link to
+           Settings in the needs-confirm banner: it is Settings, the page to act on
+           rather than to leave from. -->
+      @if (dev(); as d) {
+        <!-- unclaimed_email is the address the money was actually sent to, frozen on the
+             payout row at batch creation -- not payout_method.email below, which may have
+             changed since. -->
+        @if (d.unclaimed_cents > 0 && d.unclaimed_email) {
+          <tk-banner data-unclaimed class="mt-3 max-w-[68ch]" tone="info"><tk-money [cents]="d.unclaimed_cents" /> is waiting for you at PayPal under {{ d.unclaimed_email }}. Sign in to PayPal with that address, or create an account with it, within 30 days to receive it.</tk-banner>
+        }
+        @if (d.payout_method_needs_confirm) {
+          <tk-banner data-needs-confirm class="mt-3 max-w-[68ch]" tone="error">PayPal could not deliver your last payout, so the money is back in your balance. Check the address below and save it again to receive the next run.</tk-banner>
+        }
+      }
       <!-- The label is new, and this was a placeholder-only control: the address a
            developer is paid at, with no accessible name at all once it had text in
            it. Design system 8 counts eleven of these; two of them were on this page.
            A label above the control means the button goes below it rather than
            beside it (R347). -->
       <form class="mt-3 flex max-w-md flex-col gap-3" (ngSubmit)="savePayout()">
-        <mw-field label="PayPal email" [error]="saveFailed() ?? ''">
-          <input mw-input name="paypal" type="email" autocomplete="email" [(ngModel)]="paypalEmail" placeholder="you@example.com" />
-        </mw-field>
-        <button type="submit" data-save mw-button class="self-start" [disabled]="!paypalEmail.trim() || saving()">Save</button>
+        <tk-field label="PayPal email" [error]="saveFailed() ?? ''">
+          <input tk-input name="paypal" type="email" autocomplete="email" [(ngModel)]="paypalEmail" placeholder="you@example.com" />
+        </tk-field>
+        <button type="submit" data-save tk-button class="self-start" [disabled]="!paypalEmail.trim() || saving()">Save</button>
       </form>
-      @if (saved()) { <mw-banner class="mt-3 max-w-md" tone="done">Saved.</mw-banner> }
+      @if (saved()) { <tk-banner class="mt-3 max-w-md" tone="done">Saved.</tk-banner> }
     </section>
 
     <section class="mt-10">
@@ -57,9 +71,9 @@ const BLANK = '—'
       <p class="mt-2 max-w-[68ch] text-small"><span class="font-medium">Never collected:</span> {{ neverList }}.</p>
 
       @if (dataFailed()) {
-        <mw-banner class="mt-3" tone="error">Couldn't load the values below. The three lists above still hold; reload the page to see what is in them.</mw-banner>
+        <tk-banner class="mt-3" tone="error">Couldn't load the values below. The three lists above still hold; reload the page to see what is in them.</tk-banner>
       } @else if (data(); as d) {
-        <dl mw-record class="mt-3">
+        <dl tk-record class="mt-3">
           <dt>GitHub login</dt><dd data-field="github_login">{{ d.github_login }}</dd>
           <dt>Operating system</dt><dd data-field="os">{{ d.os ?? blank }}</dd>
           <dt>Claude Code version</dt><dd data-field="tool_version">{{ d.tool_version ?? blank }}</dd>
@@ -81,7 +95,7 @@ const BLANK = '—'
          ink, a sentence saying it cannot be undone, five bullets of consequence, a
          control that will not arm until the word is typed, and a red button. The
          frame was the sixth, and it was the one carrying no information. -->
-    <section mw-card pad="lg" class="mt-10">
+    <section tk-card pad="lg" class="mt-10">
       <h2 class="text-h3 text-rejected-fg dark:text-rejected-edge">Delete my account</h2>
       <!-- What the server does is deleteDeveloperAccount, which anonymises: the
            answers, the ledger entries and the payouts stay, because a buyer has
@@ -94,15 +108,15 @@ const BLANK = '—'
         <li data-keeps><span class="font-medium">Kept:</span> your answers, the ledger entries behind them, and any payout already made — accounting records a buyer has been charged for, left with nothing on them that names you. The account row stays too, emptied: an internal id, the date you first signed up, and your GitHub id, which is what stops the account being made again.</li>
         <li>Your command-line token stops working, every browser session ends, and any sign-in link still outstanding stops working.</li>
         <li>Your GitHub account cannot be used with Tickover again.</li>
-        <li>Anything not yet paid out is forfeited: a deleted account is left out of every payout run. Payouts go monthly from <mw-money [cents]="payoutMinCents" />, so if you are owed money, wait for the next one.</li>
+        <li>Anything not yet paid out is forfeited: a deleted account is left out of every payout run. Payouts go monthly from <tk-money [cents]="payoutMinCents" />, so if you are owed money, wait for the next one.</li>
       </ul>
       <div class="mt-4 flex max-w-md flex-col gap-3">
-        <mw-field label="Type delete to confirm">
-          <input mw-input name="confirm" [(ngModel)]="confirmText" placeholder="delete" />
-        </mw-field>
-        <button type="button" data-delete mw-button variant="danger" class="self-start" (click)="remove()" [disabled]="!canDelete() || deleting()">Delete my account</button>
+        <tk-field label="Type delete to confirm">
+          <input tk-input name="confirm" [(ngModel)]="confirmText" placeholder="delete" />
+        </tk-field>
+        <button type="button" data-delete tk-button variant="danger" class="self-start" (click)="remove()" [disabled]="!canDelete() || deleting()">Delete my account</button>
       </div>
-      @if (deleteFailed()) { <mw-banner class="mt-3 max-w-md" tone="error">Couldn't delete your account. Nothing was removed; try again.</mw-banner> }
+      @if (deleteFailed()) { <tk-banner class="mt-3 max-w-md" tone="error">Couldn't delete your account. Nothing was removed; try again.</tk-banner> }
     </section>`,
 })
 export default class SettingsPage {
@@ -115,6 +129,10 @@ export default class SettingsPage {
   sentList = SENT_LIST
   derivedList = DERIVED_LIST
   neverList = NEVER_LIST
+  /** The signal itself, re-exposed: `auth` stays private, and the template only ever
+   *  reads the developer through here — the same shape `index.page.ts`'s public `auth`
+   *  gives it, without widening this class's own access to the whole principal. */
+  dev = this.auth.developer
 
   paypalEmail = this.auth.developer()?.payout_method?.email ?? ''
   confirmText = ''

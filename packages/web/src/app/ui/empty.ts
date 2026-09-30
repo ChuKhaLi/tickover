@@ -18,7 +18,7 @@ import { Component, input } from '@angular/core'
  * marketing moment; this is a row of a list that happens to have no rows.
  */
 @Component({
-  selector: 'mw-empty',
+  selector: 'tk-empty',
   template: `
     <!-- The cap belongs here and not at the call site. The sentence is an input, so
          source cannot see how long it renders -- and the widest one in the product

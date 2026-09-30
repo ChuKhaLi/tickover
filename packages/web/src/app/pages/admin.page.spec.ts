@@ -94,7 +94,7 @@ describe('admin AdminLayout', () => {
     expect(el.textContent).toContain('the session is still live')
   })
 
-  // One layout, one chrome. A second `<mw-shell>` on a child page shows up here and
+  // One layout, one chrome. A second `<tk-shell>` on a child page shows up here and
   // nowhere else. The child-route probe is a string only the invariants page can
   // produce — not a nav label, which the header renders whether the outlet works or
   // not (measured on `dev.page.spec.ts`, where exactly that made the probe vacuous).

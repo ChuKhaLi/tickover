@@ -97,6 +97,27 @@ describe('login', () => {
     }
   }, 30_000)
 
+  // Captured 2026-09-29 against the published 0.1.1 with serverUrl on a dead port: the daemon
+  // answered /v1/login/start with a 500, the CLI printed "Open undefined and enter the code:
+  // undefined", slept NaN ms 200 times, claimed "Timed out waiting for GitHub" about a second later
+  // and exited 0. A developer whose network is down, or whose server is, gets told to go to a URL
+  // that does not exist and that GitHub was slow.
+  it('fails with a reason when the server cannot start a login, instead of relaying undefined', async () => {
+    const t = await startTestDaemon({ loggedOut: true, serverUrl: 'http://127.0.0.1:9' })
+    const out: string[] = []
+    const sleeps: number[] = []
+    try {
+      await expect(runLoginCli(t.home, { out: (s) => out.push(s), sleep: async (ms) => { sleeps.push(ms) } }))
+        .rejects.toThrow('Could not start a login')
+      expect(out.join('\n')).not.toContain('undefined')
+      expect(out.join('\n')).not.toContain('Timed out waiting for GitHub')
+      expect(sleeps).toEqual([])
+      expect(readConfig(t.home).apiToken).toBeNull()
+    } finally {
+      await t.stop()
+    }
+  })
+
   it('times out after 200 polls that never resolve, respecting the server-given interval, and never writes a token', async () => {
     const t = await startTestDaemon({ loggedOut: true })
     // pollsUntilComplete this high means every one of runLoginCli's 200 polls sees 'pending' --

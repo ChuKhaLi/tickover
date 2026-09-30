@@ -4,13 +4,13 @@
  *
  *     pnpm --filter @tickover/web og
  *
- * The status-line replica is composed by `formatStatusLine`, the same function `mw-pane`
- * calls and the daemon calls -- not a hand-written string that looks like one. `mw-pane`'s
+ * The status-line replica is composed by `formatStatusLine`, the same function `tk-pane`
+ * calls and the daemon calls -- not a hand-written string that looks like one. `tk-pane`'s
  * own comment says why a second composer would drift, and it would drift in the direction
  * that matters most here: a link preview showing a line the client would never print is a
  * product claim that is false, on the one image every Reddit and X post renders as a card.
  * `HERO_STUDY` and the contract functions are plain data and pure functions -- importing
- * `mw-pane` itself would pull an Angular component into this Node script, which is what
+ * `tk-pane` itself would pull an Angular component into this Node script, which is what
  * `hero-study.ts`'s own comment says fails at run time.
  *
  * Fonts are inlined as base64 `data:` URIs read straight out of `node_modules`, the same
@@ -35,7 +35,7 @@ const MONO_600 = fontBase64('@fontsource/ibm-plex-mono', 'ibm-plex-mono-latin-60
 
 const logoSvg = readFileSync(resolve(packageRoot, 'public/logo.svg'), 'utf8')
 
-// The same replica `mw-pane` draws, so the card never claims a line the client would not
+// The same replica `tk-pane` draws, so the card never claims a line the client would not
 // print. `price_cents` comes from `quoteStudy` (R49: a money claim comes from the contract,
 // never a hand-typed literal) rather than a bare number: this is one specific, plausible
 // sample question, an untargeted at-market study, so its per-response payout is exactly what
@@ -44,7 +44,7 @@ const logoSvg = readFileSync(resolve(packageRoot, 'public/logo.svg'), 'utf8')
 // one image every Reddit and X post renders as a card.
 //
 // PANE_COLS is not 80 (a real terminal default) here: it is chosen, below, to be exactly
-// what the box on this 1200px-wide card can hold at PANE_FONT_PX, the same way `mw-pane`
+// what the box on this 1200px-wide card can hold at PANE_FONT_PX, the same way `tk-pane`
 // derives its own width from the budget rather than the other way round -- fixing a
 // defect a controller found by looking at the rendered PNG: at 80 columns and 23px, the
 // composed line ("…3 Warp") ran past the box's own right edge, because the box's CSS
@@ -57,7 +57,7 @@ const PANE_PAD_PX = 22
 const PANE_BORDER_PX = 1
 /** `1200 - 2*88` (the card width less `body`'s own left/right padding, below). */
 const CONTENT_WIDTH_PX = 1024
-/** One character, in `em`, of the mono face -- `mw-pane`'s own `ADVANCE_EM` (`pane.ts`),
+/** One character, in `em`, of the mono face -- `tk-pane`'s own `ADVANCE_EM` (`pane.ts`),
  * measured there against the built page and re-stated here rather than imported: `pane.ts`
  * does not export it, and importing an `@Component`-decorated file into this plain Node
  * script is the failure `hero-study.ts`'s own comment already ruled out for a different
@@ -81,7 +81,7 @@ const PANE_COLS = Math.floor(
 )
 
 const budget = resolveColumns({ detected: PANE_COLS })
-/** The terminal itself, in characters -- `mw-pane`'s own `resolved` (`budget + margin`),
+/** The terminal itself, in characters -- `tk-pane`'s own `resolved` (`budget + margin`),
  * which is what the box is sized to, not `budget`: the composed line is `resolved -
  * margin` characters at most, so sizing the box to `resolved` reproduces the same spare
  * margin a real terminal leaves (see `statusline.ts`'s comment on `STATUS_LINE_SAFETY_MARGIN`). */
@@ -115,7 +115,7 @@ function escapeHtml(v: string): string {
 }
 
 /**
- * Coloured the way `mw-pane` colours it: split on the separator, the sponsor by position
+ * Coloured the way `tk-pane` colours it: split on the separator, the sponsor by position
  * (the second field, when there is a question), a payout by its own shape. `pane.spec.ts`
  * is what proves the pane's own version rejoins to the composer's output; this is a
  * one-off render, not a component, so it is not asserted the same way -- `og.png`'s own
@@ -153,7 +153,7 @@ const html = `<!doctype html>
   .mark span { font-size: 26px; font-weight: 600; letter-spacing: -0.01em; color: #CFD6D5; }
   h1 { font-size: 58px; font-weight: 600; line-height: 1.12; letter-spacing: -0.02em; max-width: 920px; margin-bottom: 52px; }
   /* align-self overrides body's flex-stretch (the column flex container's own default),
-     so the pane sizes to its content -- the same "w-fit" mw-pane itself uses -- rather
+     so the pane sizes to its content -- the same "w-fit" tk-pane itself uses -- rather
      than stretching to the card's full width, which is what silently let the row's own
      width disagree with the box in the first place. */
   .pane { display: inline-block; align-self: flex-start; background: #070A0A; border: ${PANE_BORDER_PX}px solid #22837E; border-radius: 8px; padding: 18px ${PANE_PAD_PX}px; }

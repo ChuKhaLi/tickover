@@ -100,9 +100,15 @@ function composeQuestion(q: ServedQuestion, max: number): string | null {
   })
   const avail = max - displayWidth(prefix)
 
-  // 1. Everything fits as authored.
+  // 1. Everything fits as authored -- and, when there is room left for it, where to answer.
+  //    Typing an option's number into Claude Code sends it as a prompt (captured 2026-09-29, the
+  //    first thing a developer did with their first production question), so the line says where
+  //    the keystroke goes whenever that costs no part of the question.
   const whole = render(opts)
-  if (displayWidth(text) + 1 + displayWidth(whole) <= avail) return `${prefix}${text} ${whole}`
+  const full = `${prefix}${text} ${whole}`
+  if (displayWidth(text) + 1 + displayWidth(whole) <= avail) {
+    return displayWidth(full) + displayWidth(ANSWER_HINT) + 3 <= max ? `${full} · ${ANSWER_HINT}` : full
+  }
 
   // 2. Squeeze the question text, keep every option whole.
   const textOnly = avail - 1 - displayWidth(whole)
@@ -124,8 +130,19 @@ function composeQuestion(q: ServedQuestion, max: number): string | null {
   if (textWithHint >= TEXT_MIN) return `${prefix}${truncateToWidth(text, textWithHint)} · ${hint}`
 
   // 5. Not even sponsor + payout + a question fragment fit. Section 4.7's disclosure is
-  //    unconditional, so the question is suppressed rather than the disclosure degraded.
+  //    unconditional, so the question is suppressed rather than the disclosure degraded. The caller
+  //    says one is waiting instead, which shows neither the question nor its sponsor.
   return null
+}
+
+const ANSWER_HINT = 'answer: tickover pane'
+
+// Stands in for a question too narrow to disclose. It used to be the ordinary idle line, which
+// told a developer in a narrow split pane nothing: captured 2026-09-29, a real question vanished at
+// COLUMNS=60.
+function waitingLine(max: number): string {
+  const withHint = `tickover · question waiting · ${ANSWER_HINT}`
+  return displayWidth(withHint) <= max ? withHint : 'tickover · question waiting'
 }
 
 export function formatStatusLine(i: StatusInput): string {
@@ -134,7 +151,7 @@ export function formatStatusLine(i: StatusInput): string {
   const idle = `tickover · ${tail}`
   let line: string
   if (!i.loggedIn) line = 'tickover · run /tickover:setup to start earning'
-  else if (i.question) line = composeQuestion(i.question, max) ?? idle
+  else if (i.question) line = composeQuestion(i.question, max) ?? waitingLine(max)
   else if (i.answered) line = `tickover · ✓ +${money(i.answered.earnedCents)} · ${tail}`
   else line = idle
   // Individual pieces (question text, option text, sponsor) are already sanitized above.

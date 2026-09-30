@@ -14,9 +14,9 @@ const meta: Meta = {
   render: (args) => ({
     props: args,
     template: `
-      <mw-field [label]="label" [hint]="hint" [error]="error" style="max-width:24rem">
-        <input mw-input type="email" placeholder="you@company.com" />
-      </mw-field>`,
+      <tk-field [label]="label" [hint]="hint" [error]="error" style="max-width:24rem">
+        <input tk-input type="email" placeholder="you@company.com" />
+      </tk-field>`,
   }),
 }
 export default meta
@@ -48,12 +48,12 @@ export const WhatAPlaceholderCannotDo: Story = {
   render: () => ({
     template: `
       <div style="display:flex; flex-direction:column; gap:20px; max-width:24rem">
-        <mw-field label="Sponsor name shown to developers" hint="Shown with every paid question.">
-          <input mw-input type="text" value="Raycast" />
-        </mw-field>
-        <mw-field label="Rejection note" hint="The buyer reads this.">
-          <textarea mw-input rows="3"></textarea>
-        </mw-field>
+        <tk-field label="Sponsor name shown to developers" hint="Shown with every paid question.">
+          <input tk-input type="text" value="Raycast" />
+        </tk-field>
+        <tk-field label="Rejection note" hint="The buyer reads this.">
+          <textarea tk-input rows="3"></textarea>
+        </tk-field>
       </div>`,
   }),
 }
@@ -62,8 +62,8 @@ export const WhatAPlaceholderCannotDo: Story = {
 export const Small: Story = {
   render: () => ({
     template: `
-      <mw-field label="Countries" hint="ISO codes, comma separated." style="max-width:20rem">
-        <input mw-input size="sm" type="text" placeholder="US, GB" />
-      </mw-field>`,
+      <tk-field label="Countries" hint="ISO codes, comma separated." style="max-width:20rem">
+        <input tk-input size="sm" type="text" placeholder="US, GB" />
+      </tk-field>`,
   }),
 }

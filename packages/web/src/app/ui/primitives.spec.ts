@@ -21,15 +21,15 @@ function mount<T>(type: Type<T>) {
 @Component({
   imports: [Button],
   template: `
-    <button mw-button type="submit" [disabled]="off()" class="self-start" data-primary>Email me a link</button>
-    <button mw-button variant="danger" size="sm" data-danger>Delete my account</button>
-    <a mw-button variant="quiet" href="/app" data-quiet>Load more</a>`,
+    <button tk-button type="submit" [disabled]="off()" class="self-start" data-primary>Email me a link</button>
+    <button tk-button variant="danger" size="sm" data-danger>Delete my account</button>
+    <a tk-button variant="quiet" href="/app" data-quiet>Load more</a>`,
 })
 class ButtonHost {
   off = signal(false)
 }
 
-describe('mw-button', () => {
+describe('tk-button', () => {
   /**
    * The whole reason it is a directive: `/app/login` submits a native form and its
    * spec reads `.disabled` off `button[type=submit]`. A component that wrapped the
@@ -70,26 +70,26 @@ describe('mw-button', () => {
   })
 
   it('marks itself for the coarse-pointer floor', () => {
-    // `styles.css` raises every `[data-mw-control]` to 44px under `pointer: coarse`.
+    // `styles.css` raises every `[data-tk-control]` to 44px under `pointer: coarse`.
     // Set by the directive so no screen has to remember to opt in.
     const { el } = mount(ButtonHost)
-    expect(el.querySelectorAll('[data-mw-control]')).toHaveLength(3)
+    expect(el.querySelectorAll('[data-tk-control]')).toHaveLength(3)
   })
 })
 
 @Component({
   imports: [Field, Input],
   template: `
-    <mw-field label="Work email" [hint]="hint()" [error]="error()">
-      <input mw-input type="email" />
-    </mw-field>`,
+    <tk-field label="Work email" [hint]="hint()" [error]="error()">
+      <input tk-input type="email" />
+    </tk-field>`,
 })
 class FieldHost {
   hint = signal('The address your team already uses.')
   error = signal('')
 }
 
-describe('mw-field', () => {
+describe('tk-field', () => {
   it('gives the control a real label, which a placeholder is not', () => {
     const { el } = mount(FieldHost)
     const input = el.querySelector('input') as HTMLInputElement
@@ -145,9 +145,9 @@ describe('mw-field', () => {
 @Component({
   imports: [Field, Input],
   template: `
-    <mw-field label="Kind">
-      <select mw-input><option value="profile">profile</option></select>
-    </mw-field>`,
+    <tk-field label="Kind">
+      <select tk-input><option value="profile">profile</option></select>
+    </tk-field>`,
 })
 class SelectHost {}
 
@@ -155,17 +155,17 @@ class SelectHost {}
  * A select is a control with the same problem an input has: its own surface is white
  * on a near-white page, so the edge is the whole of what says a control is here. The
  * directive covers it rather than each screen restating the class string -- and
- * `mw-field` finds it through the same content query, which is the half that would
+ * `tk-field` finds it through the same content query, which is the half that would
  * break silently, because a field whose label points at nothing still renders.
  */
-describe('mw-input on a select', () => {
+describe('tk-input on a select', () => {
   it('is styled and labelled exactly as the text controls are', () => {
     const { el } = mount(SelectHost)
     const select = el.querySelector('select') as HTMLSelectElement
     expect(select.className, 'the select carries no control edge').toMatch(/\bborder-ink-\d+\b/)
-    expect(select.getAttribute('data-mw-control'), 'the coarse-pointer target floor skips it').toBe('')
+    expect(select.getAttribute('data-tk-control'), 'the coarse-pointer target floor skips it').toBe('')
     const label = el.querySelector('label') as HTMLLabelElement
-    expect(select.id, 'mw-field did not find the select, so its label points at nothing').toBeTruthy()
+    expect(select.id, 'tk-field did not find the select, so its label points at nothing').toBeTruthy()
     expect(label.getAttribute('for')).toBe(select.id)
   })
 })
@@ -173,12 +173,12 @@ describe('mw-input on a select', () => {
 @Component({
   imports: [Banner],
   template: `
-    <mw-banner tone="done" data-done>Check your email.</mw-banner>
-    <mw-banner tone="error" data-error>Couldn't send the link.</mw-banner>`,
+    <tk-banner tone="done" data-done>Check your email.</tk-banner>
+    <tk-banner tone="error" data-error>Couldn't send the link.</tk-banner>`,
 })
 class BannerHost {}
 
-describe('mw-banner', () => {
+describe('tk-banner', () => {
   /**
    * `alert` interrupts and `status` waits. An error the person has just caused is
    * worth interrupting for; a confirmation read out over whatever they were
@@ -207,12 +207,12 @@ describe('mw-banner', () => {
 @Component({
   imports: [Money],
   template: `
-    <mw-money [cents]="2750" data-speech />
-    <mw-money voice="data" [cents]="2750" data-data />`,
+    <tk-money [cents]="2750" data-speech />
+    <tk-money voice="data" [cents]="2750" data-data />`,
 })
 class MoneyHost {}
 
-describe('mw-money', () => {
+describe('tk-money', () => {
   /**
    * Money in a sentence is the interface speaking; money in a column is the machine
    * reporting (R325). Both render the same figure, and only one of them is set in
@@ -241,7 +241,7 @@ describe('mw-money', () => {
 
 @Component({
   imports: [StudyBadge],
-  template: `@for (s of states; track s) { <mw-study-badge [state]="s" [attr.data-state]="s" /> }`,
+  template: `@for (s of states; track s) { <tk-study-badge [state]="s" [attr.data-state]="s" /> }`,
 })
 class BadgeHost {
   states: Array<'draft' | 'in_review' | 'live' | 'closed' | 'settled' | 'rejected'> = [
@@ -253,7 +253,7 @@ function chipOf(el: HTMLElement, state: string): HTMLElement {
   return el.querySelector(`[data-state=${state}] span`) as HTMLElement
 }
 
-describe('mw-study-badge', () => {
+describe('tk-study-badge', () => {
   it('names every state in words, so colour never carries the meaning alone', () => {
     const { el } = mount(BadgeHost)
     expect(chipOf(el, 'draft').textContent).toBe('draft')
@@ -303,13 +303,13 @@ describe('mw-study-badge', () => {
 
 @Component({
   imports: [StateTrack],
-  template: `<mw-state-track [state]="state()" />`,
+  template: `<tk-state-track [state]="state()" />`,
 })
 class TrackHost {
   state = signal<'draft' | 'in_review' | 'live' | 'closed' | 'settled' | 'rejected'>('draft')
 }
 
-describe('mw-state-track', () => {
+describe('tk-state-track', () => {
   /**
    * The position, which is the question the chip beside it cannot answer. Asserted
    * as the index the step lands at rather than as "a step is marked", because a
@@ -375,9 +375,9 @@ describe('mw-state-track', () => {
 @Component({
   imports: [Meta, Range, RecordList],
   template: `
-    <p mw-meta data-meta><span>Sponsor Acme</span><span>100 respondents</span></p>
-    <input type="range" mw-range data-range class="w-56" />
-    <dl mw-record data-record><dt data-term>pending</dt><dd>held until that study closes.</dd></dl>`,
+    <p tk-meta data-meta><span>Sponsor Acme</span><span>100 respondents</span></p>
+    <input type="range" tk-range data-range class="w-56" />
+    <dl tk-record data-record><dt data-term>pending</dt><dd>held until that study closes.</dd></dl>`,
 })
 class TreatmentHost {}
 

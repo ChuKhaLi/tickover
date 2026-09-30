@@ -18,9 +18,9 @@ const DEV_LINKS = [
 @Component({
   imports: [Shell, Identity, RouterOutlet],
   template: `
-    <mw-shell [links]="links">
+    <tk-shell [links]="links">
       @if (auth.developer(); as d) {
-        <mw-identity
+        <tk-identity
           slot="right"
           [who]="d.github_login"
           [busy]="busy()"
@@ -30,7 +30,7 @@ const DEV_LINKS = [
         />
       }
       <router-outlet />
-    </mw-shell>`,
+    </tk-shell>`,
 })
 export default class DevLayout {
   auth = inject(AuthState)

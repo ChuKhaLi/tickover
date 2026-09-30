@@ -8,9 +8,9 @@
  * trust position is that the plugin is open source. So the questions are ones Tickover genuinely
  * wants answered, under Tickover's own name, funded by Tickover.
  *
- * **What that costs.** At-cost pricing is `developerCents + AT_COST_FEE_CENTS` = 55c per answer, of
+ * **What that costs.** At-cost pricing is `developerCents + AT_COST_FEE_CENTS` = 56c per answer, of
  * which 50c reaches the developer. Three questions at the 50-respondent minimum is a hold of
- * **8,250 cents ($82.50)**, $75 of it paid out. `seedLaunch` will not create this study unless the
+ * **8,400 cents ($84.00)**, $75 of it paid out. `seedLaunch` will not create this study unless the
  * caller passes the funding explicitly — money never moves as a side effect of seeding content.
  *
  * **The consequence to remember:** an at-cost study never carries an attention check
@@ -29,7 +29,7 @@ export const LAUNCH_STUDY_TITLE = 'Tickover day one'
  * the swept legibility test did not cover, and it failed that test the moment it was pointed at it:
  * `A friend`/`Numbers`/`Slowness`/`Privacy`/`Sometimes` fragmented across thirty budgets including
  * the default, rendering as `1 A frie…  2 A demo  3 Numbers`. It is now swept alongside the other
- * two, which matters more here than anywhere: this is the study Tickover is paying $82.50 for and
+ * two, which matters more here than anywhere: this is the study Tickover is paying $84.00 for and
  * the first paid question most developers will ever see.
  *
  * They ask about the panel's own behaviour rather than about Claude Code or Anthropic, which §4.7

@@ -20,22 +20,22 @@ import { Empty } from './empty'
  * harmless here, because every caller iterates a signal that is empty until the data
  * lands, but worth knowing before putting something expensive in the slot.
  *
- * A second slot, `mw-empty-action`, reaches the empty rung. An empty screen is an
+ * A second slot, `tk-empty-action`, reaches the empty rung. An empty screen is an
  * invitation to act, and the invitation is usually a link -- which `emptySays` cannot
  * carry, because it is a string. Without it a caller with a link to offer has to leave
  * the ladder and hand-roll the rung, which is the one thing this component exists to
  * stop. The slot is selected, so the data content still lands in the default one.
  */
 @Component({
-  selector: 'mw-async',
+  selector: 'tk-async',
   imports: [Banner, Empty],
   template: `
     @if (failed()) {
-      <mw-banner data-load-failed tone="error">{{ failedSays() }}</mw-banner>
+      <tk-banner data-load-failed tone="error">{{ failedSays() }}</tk-banner>
     } @else if (loading()) {
       <p data-loading class="py-3 text-small text-ink-600 dark:text-ink-400">Loading…</p>
     } @else if (empty()) {
-      <mw-empty data-empty [says]="emptySays()"><ng-content select="[mw-empty-action]" /></mw-empty>
+      <tk-empty data-empty [says]="emptySays()"><ng-content select="[tk-empty-action]" /></tk-empty>
     } @else {
       <ng-content />
     }

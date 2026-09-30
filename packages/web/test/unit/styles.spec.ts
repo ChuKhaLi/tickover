@@ -63,12 +63,20 @@ function stylesheet(): string {
  * names the offending variable. The two split the work — this one says the size moved
  * and to account for it, that one says the size moved for a reason that is not allowed.
  */
-// 25_788 -> 26_356, +568, for the mono faces written out by hand (R415): each of the four
-// `IBM Plex Mono` rules gains its `unicode-range` (two vietnamese, two latin, copied from
-// fontsource's own `400.css`), and the vietnamese pair now comes first, as it does there. Diffed
-// rule by rule against the previous build with hashes stripped: nothing outside those four rules
-// moved. The earlier entry this replaces is in web-stylesheet-baseline-log.md.
-const BASELINE_BYTES = 26_356
+// 26_993 -> 26_937, -56, for the CLS fix round 2 (R384, task 6 re-review finding): the caret's
+// anchor moved from the padded/bordered prompt box to a tight `relative` wrapper span around just
+// its own three spans, which fixed the caret sitting 8px short of the typed text (the box's
+// padding the old anchor never accounted for) and let `.tk-caret`'s own CSS rule -- which already
+// declared position/top/left -- be the caret's only source of those three, dropping the redundant
+// `absolute top-0 left-0` Tailwind classes from the markup. Diffed rule by rule against a build of
+// fix round 1's commit (dcd3ed1) in a scratch worktree: `.absolute` (28B), `.left-0` (15B) and
+// `.top-0` (13B) are the whole delta, all now unused, and nothing else moved.
+// 26_937 -> 27_085, +148, for the final review's I1 (R384): the hero's play control keeps one
+// width whatever its label reads, so a label change the visitor did not make can no longer wrap
+// its row and move the page. Diffed rule by rule against a clean build of 1638b18 in a scratch
+// worktree: `.tk-stack` (50B), `.tk-stack>*` (26B) and `.tk-stack>[data-sizer]:after` (72B) are the
+// whole delta; nothing else moved (the I2 wrapper's `whitespace-pre` was already in the sheet).
+const BASELINE_BYTES = 27_085
 
 /**
  * Every earlier movement of this number, attributed to the byte, is in
@@ -111,6 +119,10 @@ describe('the emitted stylesheet', () => {
    * spec §4.7's "a hidden sponsor" and "attention (hidden check)" — so it is an
    * orphan by accident of vocabulary, not prose contamination, and it stays.
    *
+   * `relative` left this list in the CLS fix round (R384, fix round 1, task 6 finding):
+   * `index.page.ts`'s prompt box gained `class="relative"` so the caret has a positioning context to
+   * be pinned against, which is exactly the case this comment already asked for below.
+   *
    * If a template ever legitimately uses one of these, delete it from the list in
    * the same commit. Do not add an `@source not` line to hide it.
    */
@@ -135,11 +147,28 @@ describe('the emitted stylesheet', () => {
     expect(readFileSync(stylesheet(), 'utf8')).not.toMatch(/url\(["']?@/)
   })
 
-  it.each(['invisible', 'visible', 'fixed', 'relative', 'table', 'filter', 'static'])(
+  it.each(['visible', 'fixed', 'table', 'filter', 'static'])(
     'does not carry .%s, which no template asks for',
     (utility) => {
       expect(readFileSync(stylesheet(), 'utf8'), `.${utility} is back — something outside src/ is being scanned`)
         .not.toContain(`.${utility}{`)
     },
   )
+})
+
+describe('the component prefix', () => {
+  // The product was renamed from Meanwhile to Tickover; mw- is the old name (spec 2026-09-29 §3).
+  it('is tk- everywhere under src/, and mw- nowhere', () => {
+    const hits: string[] = []
+    const walk = (dir: string) => { for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const p = resolve(dir, e.name)
+      if (e.isDirectory()) walk(p)
+      else if (/\.(ts|css|html)$/.test(e.name) && /(^|[^A-Za-z0-9])mw-/.test(readFileSync(p, 'utf8'))) hits.push(p)
+    } }
+    walk(resolve(packageRoot, 'src'))
+    expect(hits).toEqual([])
+  })
+  it('is looking at real files: tk-button is declared', () => {
+    expect(readFileSync(resolve(packageRoot, 'src/app/ui/button.ts'), 'utf8')).toContain("selector: 'button[tk-button], a[tk-button]'")
+  })
 })

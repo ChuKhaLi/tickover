@@ -3,7 +3,7 @@ import { Button } from './button'
 
 /**
  * Rendered through `render` with a template rather than declared as a `component`,
- * because `mw-button` is a directive on a real `<button>` — which is the point of
+ * because `tk-button` is a directive on a real `<button>` — which is the point of
  * it (R321), and the workshop should show what a caller actually writes.
  */
 const meta: Meta = {
@@ -18,7 +18,7 @@ const meta: Meta = {
   args: { variant: 'primary', size: 'md', disabled: false, label: 'Submit for review' },
   render: (args) => ({
     props: args,
-    template: `<button mw-button [variant]="variant" [size]="size" [disabled]="disabled">{{ label }}</button>`,
+    template: `<button tk-button [variant]="variant" [size]="size" [disabled]="disabled">{{ label }}</button>`,
   }),
 }
 export default meta
@@ -36,10 +36,10 @@ export const EveryVariant: Story = {
   render: () => ({
     template: `
       <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:center">
-        <button mw-button variant="primary">Submit for review</button>
-        <button mw-button variant="secondary">Save draft</button>
-        <button mw-button variant="danger">Delete my account</button>
-        <button mw-button variant="quiet">Load more</button>
+        <button tk-button variant="primary">Submit for review</button>
+        <button tk-button variant="secondary">Save draft</button>
+        <button tk-button variant="danger">Delete my account</button>
+        <button tk-button variant="quiet">Load more</button>
       </div>`,
   }),
 }
@@ -49,9 +49,9 @@ export const BothSizes: Story = {
   render: () => ({
     template: `
       <div style="display:flex; gap:12px; align-items:center">
-        <button mw-button size="md">Create batch</button>
-        <button mw-button size="sm">Mark paid</button>
-        <button mw-button variant="danger" size="sm">Mark failed</button>
+        <button tk-button size="md">Create batch</button>
+        <button tk-button size="sm">Mark paid</button>
+        <button tk-button variant="danger" size="sm">Mark failed</button>
       </div>`,
   }),
 }
@@ -72,8 +72,8 @@ export const IrreversibleActionsAreButtons: Story = {
   render: () => ({
     template: `
       <div style="display:flex; gap:12px; align-items:center">
-        <button mw-button variant="secondary" size="sm">Reinstate</button>
-        <button mw-button variant="danger" size="sm">Ban</button>
+        <button tk-button variant="secondary" size="sm">Reinstate</button>
+        <button tk-button variant="danger" size="sm">Ban</button>
       </div>`,
   }),
 }

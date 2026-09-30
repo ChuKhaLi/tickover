@@ -29,12 +29,12 @@ import { Button } from './button'
  * chrome, not an action a person came to the page to take.
  */
 @Component({
-  selector: 'mw-identity',
+  selector: 'tk-identity',
   imports: [Button],
   template: `
     <span>{{ who() }}</span>
     <ng-content />
-    <button type="button" data-signout mw-button variant="quiet" size="sm" [disabled]="busy()" (click)="signOut.emit()">sign out</button>
+    <button type="button" data-signout tk-button variant="quiet" size="sm" [disabled]="busy()" (click)="signOut.emit()">sign out</button>
     @if (failed()) {
       <span role="alert" class="text-rejected-fg dark:text-rejected-edge">{{ failedSays() }}</span>
     }

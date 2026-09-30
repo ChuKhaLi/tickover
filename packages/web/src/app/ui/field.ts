@@ -22,7 +22,7 @@ let seq = 0
  * `button.ts` for why that is not negotiable in this codebase.
  */
 @Component({
-  selector: 'mw-field',
+  selector: 'tk-field',
   template: `
     <label [attr.for]="id" class="flex flex-col gap-1.5">
       <span class="text-small font-medium text-ink-800 dark:text-ink-100">{{ label() }}</span>
@@ -41,7 +41,7 @@ export class Field {
   error = input<string>('')
 
   /** Stable within a render, and unique across fields on a page. */
-  readonly id = `mw-field-${++seq}`
+  readonly id = `tk-field-${++seq}`
 
   private control = contentChild(MwInput)
 

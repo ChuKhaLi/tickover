@@ -11,7 +11,7 @@ import { ApiService } from '../lib/api'
 // a signed-out buyer to a page it also guards. The guard sits on each child
 // instead, and `app.page.spec.ts` is what keeps a later task from forgetting one.
 //
-// One `<mw-shell>` for the whole buyer area, which is also why no page under
+// One `<tk-shell>` for the whole buyer area, which is also why no page under
 // `pages/app/` renders chrome of its own.
 const BUYER_LINKS = [
   { href: '/app', label: 'Studies' },
@@ -29,9 +29,9 @@ const PUBLIC_LINKS = [
 @Component({
   imports: [Shell, Identity, Money, RouterOutlet],
   template: `
-    <mw-shell [links]="links()">
+    <tk-shell [links]="links()">
       @if (auth.buyer(); as b) {
-        <mw-identity
+        <tk-identity
           slot="right"
           [who]="b.email"
           [busy]="busy()"
@@ -39,11 +39,11 @@ const PUBLIC_LINKS = [
           failedSays="Couldn't sign you out. Try again."
           (signOut)="logout()"
         >
-          <span>credits <mw-money [cents]="b.credit_cents" /></span>
-        </mw-identity>
+          <span>credits <tk-money [cents]="b.credit_cents" /></span>
+        </tk-identity>
       }
       <router-outlet />
-    </mw-shell>`,
+    </tk-shell>`,
 })
 export default class AppLayout {
   auth = inject(AuthState)

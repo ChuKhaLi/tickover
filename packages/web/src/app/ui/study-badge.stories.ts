@@ -16,8 +16,8 @@ const meta: Meta = {
     props: args,
     template: `
       <div style="display:flex; flex-direction:column; gap:20px; max-width:28rem">
-        <mw-study-badge [state]="state" />
-        <mw-state-track [state]="state" />
+        <tk-study-badge [state]="state" />
+        <tk-state-track [state]="state" />
       </div>`,
   }),
 }
@@ -45,8 +45,8 @@ export const EveryState: Story = {
     template: `
       <div style="display:grid; grid-template-columns:7rem 1fr; gap:20px 24px; align-items:center; max-width:34rem">
         @for (s of states; track s) {
-          <mw-study-badge [state]="s" />
-          <mw-state-track [state]="s" />
+          <tk-study-badge [state]="s" />
+          <tk-state-track [state]="s" />
         }
       </div>`,
   }),
@@ -64,7 +64,7 @@ export const NotColourAlone: Story = {
     props: { states: ['draft', 'live', 'settled'] },
     template: `
       <div style="display:flex; flex-direction:column; gap:24px; max-width:28rem; filter:grayscale(1)">
-        @for (s of states; track s) { <mw-state-track [state]="s" /> }
+        @for (s of states; track s) { <tk-state-track [state]="s" /> }
       </div>`,
   }),
 }

@@ -8,6 +8,7 @@ import {
   STATUS_LINE_SAFETY_MARGIN,
   formatStatusLine,
   resolveColumns,
+  truncateToWidth,
   type ServedQuestion,
 } from '../src/index.js'
 
@@ -64,7 +65,14 @@ describe('the shipped question content, at every width the composer can produce'
    * other wrong way round -- it would call a truncated question a suppressed one, which is the
    * exact case being hunted here.
    */
-  const showsAQuestion = (line: string, cols: number) => line !== idleAt(cols)
+  const showsAQuestion = (line: string, cols: number) => line !== idleAt(cols) && !waitingAt(cols).includes(line)
+
+  /**
+   * What stands in for a question too narrow to disclose: "a question is waiting", with no sponsor
+   * and no question in it. It replaced the idle line there (2026-09-29), so it counts as not shown.
+   */
+  const waitingAt = (cols: number): string[] =>
+    ['tickover · question waiting · answer: tickover pane', 'tickover · question waiting'].map((w) => truncateToWidth(w, cols))
 
   /**
    * The options exactly as the composer lays them out: `1 Yes  2 No  3 Maybe`.
@@ -145,7 +153,7 @@ describe('the shipped question content, at every width the composer can produce'
    * It was the one content file the sweep did not reach, and it failed the moment it was pointed
    * here: `A friend`/`Numbers`/`Slowness` cut an option across thirty budgets including the default,
    * rendering as `1 A frie…  2 A demo  3 Numbers`. That matters more here than anywhere else --
-   * this is the study Tickover pays $82.50 for, and the first paid question most developers see.
+   * this is the study Tickover pays $84.00 for, and the first paid question most developers see.
    */
   it('never shows a day-one study question with an option cut, at any width', () => {
     for (const q of LAUNCH_STUDY_QUESTIONS) {

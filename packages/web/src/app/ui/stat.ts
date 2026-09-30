@@ -3,10 +3,10 @@ import { Card } from './card'
 
 /**
  * Label, value, hint. Three near-identical shapes become one, and the value is
- * projected because it is never a plain string: it is `mw-money`, a ratio, a count
+ * projected because it is never a plain string: it is `tk-money`, a ratio, a count
  * against its ceiling.
  *
- * The panel comes from `mw-card` rather than from a copy of its classes, so the one
+ * The panel comes from `tk-card` rather than from a copy of its classes, so the one
  * decision about what a panel looks like stays in one file. `h-full` is not
  * decoration -- these sit in one row, and a tile whose hint runs to two lines
  * would otherwise be taller than its neighbours and leave the row ragged.
@@ -18,10 +18,10 @@ import { Card } from './card'
  * headings.
  */
 @Component({
-  selector: 'mw-stat',
+  selector: 'tk-stat',
   imports: [Card],
   template: `
-    <div mw-card pad="lg" class="h-full">
+    <div tk-card pad="lg" class="h-full">
       <div class="text-small text-ink-600 dark:text-ink-400">{{ label() }}</div>
       <div class="mt-0.5 text-h2 text-ink-900 dark:text-ink-50"><ng-content /></div>
       @if (hint()) {

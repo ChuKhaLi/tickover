@@ -68,9 +68,10 @@ describe('question loop over the local api', () => {
     // not left unasserted -- a QuestionView with a missing or wrong shown_at would pass every
     // other assertion in this file.
     expect(served.shown_at).toBe(t.clock.now.toISOString())
-    // 76 display columns (verified with string-width) — inside the budget a 120-column terminal
-    // yields, so this pins the actual composed format rather than a budget-squeezed line (R22).
-    expect(await status(t)).toBe('tickover · Acme DB · $0.50 · Which tagline? 1 Postgres, faster  2 Cached DB')
+    // 76 display columns (verified with string-width), 100 with the answer hint — inside the budget
+    // a 120-column terminal yields, so this pins the actual composed format rather than a
+    // budget-squeezed line (R22).
+    expect(await status(t)).toBe('tickover · Acme DB · $0.50 · Which tagline? 1 Postgres, faster  2 Cached DB · answer: tickover pane')
 
     t.clock.advanceMs(2_500)
     const res = await answerReq(t, { assignment_id: servedQuestion().assignment_id, option_index: 1, source: 'pane' })
@@ -448,7 +449,7 @@ describe('question loop over the local api', () => {
     // paid count server-side) must correct the stale local balances, not be shadowed by them.
     t.daemon.loop.setSelf({
       id: '00000000-0000-4000-8000-000000000001', github_login: 'octo', activity_tier: 'light',
-      can_cash_out: true, payout_method: null,
+      can_cash_out: true, payout_method: null, payout_method_needs_confirm: false, unclaimed_cents: 0, unclaimed_email: null,
       balance_pending_cents: 500, balance_available_cents: 0, today_paid_answers: 0,
     })
     const view = await q(t)

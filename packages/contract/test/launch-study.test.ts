@@ -38,7 +38,7 @@ describe('the day-one at-cost study', () => {
     const hold = quote.priceCents * LAUNCH_STUDY_QUESTIONS.length * input.target_count
 
     expect(quote.priceCents).toBe(PRICING.BASE_CENTS * PRICING.DEVELOPER_SHARE + PRICING.AT_COST_FEE_CENTS)
-    expect(hold).toBe(8250)
+    expect(hold).toBe(8400)
   })
 
   // Targeting would raise the price (TARGETING_CENTS) and narrow the panel, and neither serves a

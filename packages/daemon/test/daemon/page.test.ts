@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { RULES, sanitizeText, isEarning, answerNotice } from '@tickover/contract'
 import { startTestDaemon, type TestDaemon } from '../helpers/daemon.js'
 import { servedQuestion } from '../helpers/fake-server.js'
-import { escapeHtml, renderQuestionHtml, money, sanitizeField, SPONSOR_MAX } from '../../src/page.js'
+import { escapeHtml, renderQuestionHtml, money, sanitizeField, SPONSOR_MAX, pageKeysHint } from '../../src/page.js'
 import { answeredAfterFrame } from '../../src/answered.js'
 
 async function hook(t: TestDaemon, event: string, session_id: string) {
@@ -214,6 +214,23 @@ describe('localhost page', () => {
       expect(calls).toHaveLength(2)
       // And the old, broken shape must be gone from the page entirely.
       expect(html).not.toContain('if (state.view.question) state.answered = null')
+    })
+  })
+
+  // Captured 2026-09-29: the page said "Keys: 1–5 answer" under a two-option question, and while
+  // there was no question at all. Chrome also logged a 404 for /favicon.ico on every load.
+  describe('keys and icon', () => {
+    it('names only the keys this question takes', () => {
+      expect(pageKeysHint(2)).toBe('Keys: 1–2 answer · 0 skip. Keep this tab open next to your terminal.')
+      expect(pageKeysHint(null)).toBe('Keep this tab open next to your terminal: questions appear here while Claude works.')
+    })
+
+    it('ships the hint into the browser, fills it on every render, and asks for no favicon', async () => {
+      const html = await (await fetch(`${t.base}/`, { headers: { cookie: `mw_daemon=${t.daemon.token}` } })).text()
+      expect(html).toContain(pageKeysHint.toString())
+      expect(html).toContain(`hint.textContent = ${pageKeysHint.name}(`)
+      expect(html).not.toContain('1–5 answer')
+      expect(html).toContain('<link rel="icon" href="data:,">')
     })
   })
 })
