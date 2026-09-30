@@ -35,10 +35,12 @@ export interface AnswerOutcome { accepted: boolean; reason: string; earned_cents
 // skill) needs a way to see the count before deleting.
 export interface HealthView { ok: true; version: string; loggedIn: boolean; sessions: number; activeTurn: boolean; queuedAnswers: number }
 export interface LoginStart { user_code: string; verification_uri: string; interval_s: number }
-// 'closed' mirrors the contract's fourth device-poll outcome (R79): GitHub authorized, and the
+// 'closed' mirrors the server's refusal of the token exchange (R79): GitHub authorized, and the
 // Tickover account behind that GitHub id is deleted or banned. It is not 'expired' -- nothing
 // here expires, and telling the developer to run `tickover login` again would be a loop.
-export type LoginStatus = { status: 'pending' } | { status: 'complete'; github_login: string } | { status: 'expired' } | { status: 'closed' } | { status: 'idle' }
+// 'denied' is the developer pressing Cancel on GitHub; 'failed' is GitHub or the server ending the
+// flow for a reason re-running cannot fix (R710 review). Both stop setup, like 'closed'.
+export type LoginStatus = { status: 'pending'; interval_s: number } | { status: 'complete'; github_login: string } | { status: 'expired' } | { status: 'closed' } | { status: 'denied' } | { status: 'failed'; reason: string } | { status: 'idle' }
 
 export interface LocalHandlers {
   hook(e: HookEvent): void

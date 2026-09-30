@@ -42,7 +42,19 @@ export interface FakeServer {
   // accountClosed makes the poll answer 'closed' where it would have answered 'complete' -- the
   // server's R79 refusal for a deleted or banned developer, which is exactly when the real one
   // says it: GitHub has authorized, and there is no Tickover account left behind it.
-  device: { userCode: string; pollsUntilComplete: number; expiresAfterPolls?: number; accountClosed?: boolean }
+  // The same knobs now drive GitHub's side, which this fake also plays (the daemon runs the device
+  // flow against GitHub itself, R710; startTestDaemon points githubUrl here). slowDownAtPolls lists
+  // the poll numbers GitHub answers with slow_down.
+  // finalError: what GitHub answers instead of a token once pollsUntilComplete is reached
+  // (access_denied, incorrect_client_credentials, ...). codeBody: replaces the device-code answer
+  // (an error body with a 200). exchangeFailTimes: the Tickover server answers the token exchange
+  // with a 503 this many times first.
+  device: { userCode: string; pollsUntilComplete: number; expiresAfterPolls?: number; accountClosed?: boolean; slowDownAtPolls?: number[]; finalError?: string; codeBody?: unknown; exchangeFailTimes?: number; exchangeFailStatus?: number; exchangeRefuse?: number; exchangeDelayMs?: number }
+  // What reached "GitHub": the client id of each device-code request, and each finished token the
+  // daemon then handed to the Tickover server.
+  github: { codeRequests: string[]; logins: string[]; lastIssued?: string }
+  // Hits on the removed server-side device routes; must stay 0.
+  serverDeviceCalls: number
   close(): Promise<void>
 }
 
@@ -56,7 +68,7 @@ function body(req: http.IncomingMessage): Promise<string> {
 
 // Mirrors the real DeveloperGuard (packages/server/src/auth/guards.ts): every authenticated
 // route requires a literal "Bearer " prefix, checked before any route-specific handling. The two
-// device-flow routes are the only ones that stay unauthenticated.
+// login routes (auth/config and auth/github) are the only ones that stay unauthenticated.
 const AUTH_REQUIRED_ROUTES = new Set(['/api/dev/me', '/api/dev/heartbeat', '/api/dev/next', '/api/dev/answers', '/api/dev/skips', '/api/dev/web-session'])
 function isAuthorized(req: http.IncomingMessage): boolean {
   const header = req.headers.authorization
@@ -75,22 +87,51 @@ export async function startFakeServer(): Promise<FakeServer> {
     nextDelayMs: 0,
     answerDelayMs: 0,
     device: { userCode: 'ABCD-0001', pollsUntilComplete: 1 },
+    github: { codeRequests: [], logins: [] },
+    serverDeviceCalls: 0,
     close: async () => {},
   }
   let polls = 0
+  let tokenIssued = false
   const server = http.createServer(async (req, res) => {
     const send = (status: number, obj: unknown) => { res.writeHead(status, { 'content-type': 'application/json' }); res.end(JSON.stringify(obj)) }
     const url = req.url ?? ''
     const raw = await body(req)
-    const json = raw ? JSON.parse(raw) : {}
+    // GitHub's OAuth endpoints take a form body; everything else here is JSON.
+    const json = !raw ? {} : (req.headers['content-type'] ?? '').includes('x-www-form-urlencoded') ? Object.fromEntries(new URLSearchParams(raw)) : JSON.parse(raw)
     if (AUTH_REQUIRED_ROUTES.has(url) && !isAuthorized(req)) return send(401, { error: 'unauthorized' })
-    if (url === '/api/dev/auth/device/start') return send(200, { poll_token: 'poll-1', user_code: f.device.userCode, verification_uri: 'https://github.com/login/device', interval_s: 1, expires_in_s: 900 })
-    if (url === '/api/dev/auth/device/poll') {
-      polls += 1
-      if (f.device.expiresAfterPolls !== undefined && polls >= f.device.expiresAfterPolls) return send(200, { status: 'expired' })
-      if (polls < f.device.pollsUntilComplete) return send(200, { status: 'pending' })
+    if (url.startsWith('/api/dev/auth/device/')) { f.serverDeviceCalls += 1; return send(404, { error: 'not_found' }) }
+    // --- the Tickover server's half ---
+    if (url === '/api/dev/auth/config') return send(200, { github_client_id: 'fake-client-id' })
+    if (url === '/api/dev/auth/github') {
+      f.github.logins.push(json.github_token)
+      // Like the real server, every successful exchange rotates the api token.
+      const issued = `api-token-${f.github.logins.length}`
+      if (f.device.exchangeDelayMs) await delay(f.device.exchangeDelayMs)
+      if (f.device.exchangeRefuse) return send(f.device.exchangeRefuse, { error: 'github_token_wrong_app' })
+      if ((f.device.exchangeFailTimes ?? 0) > 0) { f.device.exchangeFailTimes! -= 1; return send(f.device.exchangeFailStatus ?? 503, { error: 'unavailable' }) }
       if (f.device.accountClosed) return send(200, { status: 'closed' })
-      return send(200, { status: 'complete', api_token: 'api-token-1', developer: f.self })
+      f.github.lastIssued = issued
+      return send(200, { status: 'complete', api_token: issued, developer: f.self })
+    }
+    // --- GitHub's half ---
+    if (url === '/login/device/code') {
+      f.github.codeRequests.push(json.client_id)
+      tokenIssued = false
+      if (f.device.codeBody !== undefined) return send(200, f.device.codeBody)
+      return send(200, { device_code: 'dc-1', user_code: f.device.userCode, verification_uri: 'https://github.com/login/device', expires_in: 900, interval: 1 })
+    }
+    if (url === '/login/oauth/access_token') {
+      polls += 1
+      if (f.device.expiresAfterPolls !== undefined && polls >= f.device.expiresAfterPolls) return send(200, { error: 'expired_token' })
+      if (f.device.slowDownAtPolls?.includes(polls)) return send(200, { error: 'slow_down' })
+      if (polls < f.device.pollsUntilComplete) return send(200, { error: 'authorization_pending' })
+      if (f.device.finalError) return send(200, { error: f.device.finalError })
+      // Like GitHub: a device code's token is handed out once; polling the used code again is an
+      // error, not a second token.
+      if (tokenIssued) return send(200, { error: 'expired_token' })
+      tokenIssued = true
+      return send(200, { access_token: 'gho_fake_1', token_type: 'bearer', scope: '' })
     }
     if (url === '/api/dev/me') return send(200, f.self)
     if (url === '/api/dev/web-session') {

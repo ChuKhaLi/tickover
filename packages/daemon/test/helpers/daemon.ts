@@ -150,7 +150,7 @@ export async function startTestDaemon(over: Partial<DaemonOptions> & { loggedOut
   ensureHome(home)
   writeConfig(home, { ...readConfig(home), apiToken: over.loggedOut ? null : 'api-token-1' })
   const { loggedOut: _loggedOut, ...daemonOver } = over
-  const opts = { home, port: 0, clock: () => clock.now, serverUrl: fake.url, idleExitMs: 0, tickIntervalMs: 0, ...daemonOver }
+  const opts = { home, port: 0, clock: () => clock.now, serverUrl: fake.url, githubUrl: fake.url, idleExitMs: 0, tickIntervalMs: 0, ...daemonOver }
 
   // Rebinding rather than picking a port ourselves: the operating system knows which
   // ones are free and this only rejects the handful it may hand back that `fetch`

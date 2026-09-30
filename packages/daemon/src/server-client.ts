@@ -1,4 +1,4 @@
-import { AnswerResponse, DevicePollResponse, DeviceStartResponse, DeveloperSelf, NextResponse, WebSessionResponse, type AnswerRequest, type HeartbeatRequest, type NextRequest } from '@tickover/contract'
+import { AnswerResponse, AuthConfigResponse, GitHubLoginResponse, DeveloperSelf, NextResponse, WebSessionResponse, type AnswerRequest, type HeartbeatRequest, type NextRequest } from '@tickover/contract'
 import type { z } from 'zod'
 
 export class ServerError extends Error {
@@ -54,8 +54,8 @@ export class ServerClient {
     return schema.parse(parsed)
   }
 
-  deviceStart() { return this.call('/api/dev/auth/device/start', { method: 'POST', auth: false }, DeviceStartResponse) }
-  devicePoll(pollToken: string) { return this.call('/api/dev/auth/device/poll', { method: 'POST', body: { poll_token: pollToken }, auth: false }, DevicePollResponse) }
+  authConfig() { return this.call('/api/dev/auth/config', { method: 'GET', auth: false }, AuthConfigResponse) }
+  githubLogin(githubToken: string) { return this.call('/api/dev/auth/github', { method: 'POST', body: { github_token: githubToken }, auth: false }, GitHubLoginResponse) }
   me() { return this.call('/api/dev/me', { method: 'GET' }, DeveloperSelf) }
   heartbeat(body: HeartbeatRequest) { return this.call('/api/dev/heartbeat', { method: 'POST', body }, DeveloperSelf) }
   next(body: NextRequest, timeoutMs = 30_000) { return this.call('/api/dev/next', { method: 'POST', body, timeoutMs }, NextResponse) }

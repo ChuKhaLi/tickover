@@ -3,6 +3,7 @@ import { openSync, closeSync, unlinkSync, statSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import { readDaemonInfo, type DaemonInfo } from './config.js'
+import { VERSION } from './version.js'
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
@@ -46,9 +47,30 @@ function releaseLock(lockPath: string): void {
   try { unlinkSync(lockPath) } catch { /* already gone -- nothing to release */ }
 }
 
-export async function ensureDaemon(home: string, opts: { cliPath?: string; fetchFn?: typeof fetch; waitMs?: number } = {}): Promise<DaemonInfo> {
+// The version a healthy daemon reports, '' when it reports none (a stub), null when it is not
+// healthy at all.
+async function healthVersion(info: DaemonInfo, fetchFn: typeof fetch = fetch): Promise<string | null> {
+  try {
+    const res = await fetchFn(`http://127.0.0.1:${info.port}/v1/health`, { headers: { 'x-tickover-token': info.token }, signal: AbortSignal.timeout(800) })
+    if (!res.ok) return null
+    const body = (await res.json().catch(() => ({}))) as { version?: unknown }
+    return typeof body.version === 'string' ? body.version : ''
+  } catch { return null }
+}
+
+export async function ensureDaemon(home: string, opts: { cliPath?: string; fetchFn?: typeof fetch; waitMs?: number; expectVersion?: string } = {}): Promise<DaemonInfo> {
   const existing = readDaemonInfo(home)
-  if (existing && (await healthy(existing, opts.fetchFn))) return existing
+  const running = existing ? await healthVersion(existing, opts.fetchFn) : null
+  const expected = opts.expectVersion ?? VERSION
+  if (existing && running !== null) {
+    if (running === '' || running === expected) return existing
+    // A daemon of another version: setup installs a new CLI while Claude Code's status line keeps
+    // the old daemon busy, so it never idles out, and the new CLI's commands would be served by
+    // old code -- after R710, an old daemon asking the server for routes that are gone (review I2,
+    // reproduced with the published 0.1.2). It answered /v1/health with its token just now, so the
+    // pid is the daemon's; it is replaced by one of this CLI's own below.
+    try { process.kill(existing.pid, 'SIGTERM') } catch { /* already gone */ }
+  }
 
   const waitMs = opts.waitMs ?? 5000
   const lockPath = join(home, 'daemon.lock')
@@ -67,7 +89,13 @@ export async function ensureDaemon(home: string, opts: { cliPath?: string; fetch
     while (Date.now() < deadline) {
       await sleep(150)
       const info = readDaemonInfo(home)
-      if (info && info.pid !== existing?.pid && (await healthy(info, opts.fetchFn))) return info
+      // The version is checked here too: while one of this CLI's daemons is starting, a hook can
+      // start an older one from daemonBin, and whichever writes daemon.json first would otherwise be
+      // accepted (re-review N4). A mismatch keeps waiting for the one spawned above.
+      if (info && info.pid !== existing?.pid) {
+        const v = await healthVersion(info, opts.fetchFn)
+        if (v !== null && (v === '' || v === expected)) return info
+      }
     }
     throw new Error('daemon did not start')
   } finally {

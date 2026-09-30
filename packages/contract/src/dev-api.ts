@@ -27,27 +27,21 @@ export const DeveloperSelf = z.object({
 })
 export type DeveloperSelf = z.infer<typeof DeveloperSelf>
 
-export const DeviceStartResponse = z.object({
-  poll_token: z.string(),
-  user_code: z.string(),
-  verification_uri: z.string().url(),
-  interval_s: z.number().int().positive(),
-  expires_in_s: z.number().int().positive(),
-})
-export const DevicePollRequest = z.object({ poll_token: z.string().min(16) })
-// `closed` is the fourth outcome, added by the whole-branch review's C1 (R79): the GitHub account
-// authorized, but the Tickover account behind it is banned -- deleted by its own developer, or
-// banned by an operator. It is a distinct outcome because the other three cannot say it without
-// lying: `complete` hands back an api_token every guard refuses, and `expired` sends the developer
-// round the device flow again forever. No api_token and no developer travel with it; there is
-// nothing to authorize and nothing left to disclose.
-export const DevicePollResponse = z.discriminatedUnion('status', [
-  z.object({ status: z.literal('pending') }),
+// The GitHub device flow runs on the developer's machine (spec: "GitHub device flow from the
+// daemon"; R710). When the server ran it, GitHub's Authorize page told every developer the request
+// came from the server's own address. The daemon asks for the client id, runs the flow itself, and
+// hands the resulting token here once, to be exchanged for a Tickover api token.
+export const AuthConfigResponse = z.object({ github_client_id: z.string().min(1) })
+export const GitHubLoginRequest = z.object({ github_token: z.string().min(1).max(255) })
+// `closed` (R79): the GitHub account authorized, but the Tickover account behind it is banned --
+// deleted by its own developer, or banned by an operator. It is a distinct outcome because
+// `complete` would hand back an api_token every guard refuses. No api_token and no developer travel
+// with it; there is nothing to authorize and nothing left to disclose.
+export const GitHubLoginResponse = z.discriminatedUnion('status', [
   z.object({ status: z.literal('complete'), api_token: z.string(), developer: DeveloperSelf }),
-  z.object({ status: z.literal('expired') }),
   z.object({ status: z.literal('closed') }),
 ])
-export type DevicePollResponse = z.infer<typeof DevicePollResponse>
+export type GitHubLoginResponse = z.infer<typeof GitHubLoginResponse>
 
 export const HeartbeatRequest = z.object({
   os: OsName,

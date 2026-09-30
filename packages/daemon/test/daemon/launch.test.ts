@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { spawn } from 'node:child_process'
 import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync, utimesSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -10,8 +11,9 @@ import { assertFreshBundle } from '../helpers/dist.js'
 // needs to (a) record that it was ever launched at all, and (b) eventually produce a healthy
 // daemon.json, which is the only two things ensureDaemon can observe. `.cjs` so it runs as
 // CommonJS regardless of any package.json `type` field above the OS temp dir.
-function writeStubDaemon(home: string, spawnLog: string): string {
-  const stub = join(home, 'stub-daemon.cjs')
+function writeStubDaemon(home: string, spawnLog: string, version?: string, name = 'stub-daemon.cjs'): string {
+  const stub = join(home, name)
+  const health = JSON.stringify(version === undefined ? { ok: true } : { ok: true, version })
   writeFileSync(
     stub,
     [
@@ -20,7 +22,7 @@ function writeStubDaemon(home: string, spawnLog: string): string {
       "const path = require('path')",
       `fs.appendFileSync(${JSON.stringify(spawnLog)}, process.pid + '\\n')`,
       'const server = http.createServer((req, res) => {',
-      "  if (req.url === '/v1/health') { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ ok: true })); return }",
+      `  if (req.url === '/v1/health') { res.writeHead(200, { 'content-type': 'application/json' }); res.end(${JSON.stringify(health)}); return }`,
       '  res.writeHead(404); res.end()',
       '})',
       "server.listen(0, '127.0.0.1', () => {",
@@ -33,6 +35,34 @@ function writeStubDaemon(home: string, spawnLog: string): string {
 }
 
 describe('ensureDaemon', () => {
+  // Whole-branch review (R710) I2, reproduced with the published 0.1.2: setup installs a new CLI
+  // while Claude Code's status line keeps the old daemon busy, so it never idles out; the new CLI's
+  // `login` then talked to the old daemon, which asked the server for routes that no longer exist.
+  // A daemon reporting another version is replaced by one of this CLI's own.
+  it('replaces a running daemon of another version with one of its own', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'mw-launch-'))
+    const spawnLog = join(home, 'spawns.log')
+    const old = spawn(process.execPath, [writeStubDaemon(home, join(home, 'old.log'), '0.1.0', 'old-daemon.cjs')], { stdio: 'ignore' })
+    try {
+      const deadline = Date.now() + 5000
+      while (!existsSync(join(home, 'daemon.json')) && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50))
+      const oldInfo = readDaemonInfo(home)!
+      const info = await ensureDaemon(home, { cliPath: writeStubDaemon(home, spawnLog, '9.9.9'), waitMs: 10_000, expectVersion: '9.9.9' })
+      expect(info.pid).not.toBe(oldInfo.pid)
+      await new Promise((r) => setTimeout(r, 300))
+      expect(() => process.kill(oldInfo.pid, 0)).toThrow()
+      // And one of the right version is kept, not restarted again.
+      const again = await ensureDaemon(home, { cliPath: writeStubDaemon(home, spawnLog, '9.9.9'), expectVersion: '9.9.9' })
+      expect(again.pid).toBe(info.pid)
+      expect(readFileSync(spawnLog, 'utf8').trim().split('\n')).toHaveLength(1)
+      process.kill(info.pid)
+    } finally {
+      try { old.kill() } catch { /* gone */ }
+      await new Promise((r) => setTimeout(r, 300))
+      rmSync(home, { recursive: true, force: true })
+    }
+  }, 30_000)
+
   it('spawns a detached daemon when none is running and reuses it afterwards', async () => {
     const home = mkdtempSync(join(tmpdir(), 'mw-launch-'))
     // The other test that spawns the BUILT cli -- same stale-bundle exposure, same guard.

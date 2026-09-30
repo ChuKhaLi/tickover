@@ -16,17 +16,16 @@ import { IdleWatch } from './idle.js'
 import { TranscriptWatcher } from './transcript-watch.js'
 import { LoginFlow } from './login.js'
 import { composeBand } from './band.js'
-// From package.json rather than a literal: the literal was never bumped, so 0.1.1 shipped reporting
-// 0.1.0 from `tickover version`, `tickover status` and /v1/health. esbuild inlines the JSON into
-// dist/cli.js, so nothing reads package.json at runtime.
-import pkg from '../package.json' with { type: 'json' }
-
-export const VERSION: string = pkg.version
+import { VERSION } from './version.js'
+export { VERSION }
 export const PORT_RANGE = Array.from({ length: 10 }, (_, i) => 47321 + i)
 
 export interface DaemonOptions {
   home: string
   serverUrl?: string
+  // Where the GitHub device flow is run from this machine (R710). Tests point it at their fake;
+  // nothing else sets it, and there is deliberately no environment variable for it.
+  githubUrl?: string
   port?: number
   clock?: () => Date
   fetchFn?: typeof fetch
@@ -111,7 +110,7 @@ export async function startDaemon(opts: DaemonOptions): Promise<RunningDaemon> {
   loop = new QuestionLoop({ server: serverClient, sessions, state, queue, clock, log, hub, loggedIn })
 
   const heartbeat = new Heartbeat({ server: serverClient, sessions, state, loop, clock, log, loggedIn, intervalMs: opts.heartbeatIntervalMs })
-  const login = new LoginFlow(serverClient, opts.home, loop, log)
+  const login = new LoginFlow(serverClient, opts.home, loop, log, opts.githubUrl, opts.fetchFn ?? fetch, clock)
   // `running` is assigned once, in the return statement below, before startDaemon's caller can
   // ever trigger idle exit -- same forward-reference idiom as `loop` above. Needed so the default
   // onIdle can stop the daemon it's a part of without capturing a half-built object.

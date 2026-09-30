@@ -34,6 +34,11 @@ export function assertFreshBundle(): void {
     }
   }
   walk(src)
+  // package.json too: its version is inlined into the bundle (version.ts), and ensureDaemon kills a
+  // daemon whose version differs -- a bump without a rebuild would have the built CLI kill the test
+  // runner's in-process daemon (re-review N5).
+  const pkg = resolve('package.json')
+  if (statSync(pkg).mtimeMs > newestSource) { newestSource = statSync(pkg).mtimeMs; newestName = pkg }
 
   expect(builtAt, `dist/cli.js is older than ${newestName} -- run \`pnpm --filter tickover-cli build\`. These tests spawn the BUILT cli, so a stale bundle makes them pass against code that is not the code under review.`).toBeGreaterThanOrEqual(newestSource)
 }
