@@ -84,6 +84,20 @@ describe('plugin manifest', () => {
     }
   })
 
+  // Found running the real /tickover:uninstall on 2026-09-30: an edit that deleted a sentence also ate
+  // a newline, so step 2 sat at the end of step 1's line ("...login token.2. Drain..."). A model can
+  // still read that; the next edit to either step is likelier to break it. Every numbered step of
+  // both skills starts a line, and the numbers run in order from where they start.
+  it('keeps each numbered skill step on a line of its own', () => {
+    for (const skill of SKILLS) {
+      const text = readFileSync(join(root, `skills/${skill}/SKILL.md`), 'utf8')
+      const starts = [...text.matchAll(/^(\d+)\. /gm)].map((m) => Number(m[1]))
+      expect(starts.length, skill).toBeGreaterThan(3)
+      expect(starts, skill).toEqual(starts.map((_, i) => starts[0]! + i))
+      expect(text, `${skill}: a step number runs on from the previous sentence`).not.toMatch(/[.)`]\d+\. [A-Z]/)
+    }
+  })
+
   it('is listed in the repo marketplace with a relative source', () => {
     const mk = JSON.parse(readFileSync(join(repo, '.claude-plugin/marketplace.json'), 'utf8'))
     const entry = mk.plugins.find((p: { name: string }) => p.name === 'tickover')

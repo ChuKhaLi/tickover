@@ -12,7 +12,7 @@ import { quoteStudy } from '@tickover/contract'
 import { formatCents } from '../src/app/lib/money'
 import { STUDY_ID, mockApi } from './mock-api'
 
-const atCost = quoteStudy({ targeted: false, atCost: true })
+const atCost = quoteStudy({ targeted: true, atCost: true })
 
 /**
  * The wizard steps both the covered and the uncovered submit share: open it from
@@ -40,8 +40,32 @@ async function writeAndSubmitStudy(page: Page): Promise<void> {
   // disagreeing, and it is the DOM that gets posted.
   await expect(page.locator('input[name="q0o1"]')).toHaveValue('Your DB, cached')
 
+  // The preview is the contract's composer running in the browser bundle; a
+  // broken import there would show nothing while every unit suite stayed green.
+  const line = page.locator('[data-preview-line]').first()
+  await expect(line).toContainText('tickover · Acme DB ·')
+  // The preview opens at its 80-column default (at 60 this question renders the waiting line, not the question); the digit and its first word are what is asserted.
+  await expect(line).toContainText('1 Postgres')
+
+  // Countries by name. UK is what people type and GB is what developers carry.
+  const countries = page.getByRole('combobox', { name: /Search countries/ })
+  // The policy is ticked first so that the submit button is enabled and submitForReview would
+  // proceed: with it unticked, a stayed URL and no POST hold even if Enter reached the form.
+  const submit = page.getByRole('button', { name: 'Submit for review' })
+  await expect(submit).toBeDisabled()
+  await page.getByRole('checkbox').check()
+  const posts: string[] = []
+  page.on('request', (r) => { if (r.method() === 'POST' && r.url().endsWith('/api/buyer/studies')) posts.push(r.url()) })
+  await countries.focus()
+  await countries.fill('uk')
+  await countries.press('Enter')
+  await expect(page.getByRole('button', { name: 'Remove United Kingdom' })).toBeVisible()
+  // Enter picked the country and did not send the study.
+  await expect(page).toHaveURL('/app/studies/new')
+  expect(posts).toEqual([])
+
   // The at-cost quote, from the contract. The panel is what the buyer commits
-  // money against, and this study is untargeted and this buyer's first.
+  // money against, and this study targets one country and is this buyer's first.
   const quote = page.getByRole('complementary')
   await expect(quote).toContainText(formatCents(atCost.priceCents))
   await expect(quote).toContainText('First study at cost')
@@ -49,9 +73,6 @@ async function writeAndSubmitStudy(page: Page): Promise<void> {
 
   // The policy tick is the claim the reviewer approves against, and the submit
   // button is disabled until it is made.
-  const submit = page.getByRole('button', { name: 'Submit for review' })
-  await expect(submit).toBeDisabled()
-  await page.getByRole('checkbox').check()
   await expect(submit).toBeEnabled()
 
   await submit.click()

@@ -62,3 +62,11 @@ export function languageMixFromExtensions(ext: Record<string, number>): Record<s
   }
   return out
 }
+
+/** What a buyer reads on a language chip. `labels.test.ts` holds it to `LANGUAGES`, key for key. */
+export const LANGUAGE_LABELS: Readonly<Record<string, string>> = Object.freeze({
+  c: 'C', cpp: 'C++', csharp: 'C#', css: 'CSS', dart: 'Dart', elixir: 'Elixir', go: 'Go', html: 'HTML',
+  java: 'Java', javascript: 'JavaScript', kotlin: 'Kotlin', php: 'PHP', powershell: 'PowerShell',
+  python: 'Python', ruby: 'Ruby', rust: 'Rust', scala: 'Scala', shell: 'Shell', sql: 'SQL',
+  svelte: 'Svelte', swift: 'Swift', typescript: 'TypeScript', vue: 'Vue',
+})

@@ -5,6 +5,15 @@ import { EXTENSION_KEY_PATTERN, MAX_EXTENSION_KEYS } from './languages.js'
 export const OsName = z.enum(['win32', 'darwin', 'linux'])
 export const ActivityTier = z.enum(['light', 'regular', 'heavy'])
 
+export const OS_LABELS: Readonly<Record<z.infer<typeof OsName>, string>> = Object.freeze({ win32: 'Windows', darwin: 'macOS', linux: 'Linux' })
+
+/**
+ * Turns in the last seven days at which a developer moves up a tier (spec §5: light under 5,
+ * regular 5 to 20, heavy over 20). The server classifies with these and the buyer's form
+ * describes the tiers with them, so the two cannot disagree (R49).
+ */
+export const ACTIVITY_TIER_THRESHOLDS = Object.freeze({ REGULAR_FROM: 5, HEAVY_FROM: 21 } as const)
+
 export const DeveloperSelf = z.object({
   id: z.string().uuid(),
   github_login: z.string(),

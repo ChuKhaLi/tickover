@@ -14,6 +14,22 @@
 // Only this process is patched. The CLI tests spawn a child (`runCli`), which keeps its own `fetch`
 // and its own message, so `cli-web.test.ts`, at `not.toContain('fetch failed')`, asserts on text this
 // cannot reach and is deliberately unaffected.
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { withFetchDiagnostics } from './helpers/daemon.js'
 
 globalThis.fetch = withFetchDiagnostics(globalThis.fetch)
+
+// No test in this suite may reach the developer's real home (R712). On 2026-09-30 a mutant that
+// ignored CLAUDE_CONFIG_DIR fell back to ~/.claude, and the suite rewrote the developer's actual
+// settings.json: their status line pointed into a deleted temp dir, Mods switched on. Every test
+// passes its own paths, so the fallback is only ever reached by a bug or a mutant -- which is exactly
+// when it must land somewhere harmless. os.homedir() reads USERPROFILE on Windows and HOME elsewhere;
+// both point at a temp dir, spawned CLIs inherit them, and the two variables that override a home
+// outright are removed so a developer's own shell settings cannot leak in either.
+const fakeHome = mkdtempSync(join(tmpdir(), 'tk-test-home-'))
+process.env.HOME = fakeHome
+process.env.USERPROFILE = fakeHome
+delete process.env.CLAUDE_CONFIG_DIR
+delete process.env.TICKOVER_HOME

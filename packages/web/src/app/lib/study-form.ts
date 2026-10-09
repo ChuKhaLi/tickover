@@ -1,4 +1,4 @@
-import { StudyInput, Targeting, isTargeted, quoteStudy, type StudyView } from '@tickover/contract'
+import { ACTIVITY_TIER_THRESHOLDS, StudyInput, Targeting, isTargeted, quoteStudy, type StudyView } from '@tickover/contract'
 import type { z } from 'zod'
 
 /**
@@ -146,6 +146,9 @@ function humanIssue(issue: z.ZodIssue): string {
     if (issue.type === 'string') return issue.exact ? `${f.label} must be exactly ${n} characters.` : `${f.label} must be ${n} characters or fewer.`
     return `${f.label} must be ${n} or fewer.`
   }
+  // zod 3 reports 75.5 as invalid_type (expected integer, received float) and NaN as
+  // invalid_type (expected number, received nan): either way, a count that is not a whole number.
+  if (issue.code === 'invalid_type' && (issue.expected === 'integer' || issue.expected === 'number')) return `${f.label} must be a whole number.`
   // Anything the map does not recognise still names the field rather than the
   // path, and still reads as a sentence.
   return `${f.label} is not valid.`
@@ -156,7 +159,10 @@ function humanIssue(issue: z.ZodIssue): string {
  * contract. The issues come back as sentences naming the field and the limit --
  * never a schema path and never zod's own wording.
  */
-export function toStudyInput(d: StudyDraft): { ok: true; input: StudyInput } | { ok: false; issues: string[] } {
+export function toStudyInput(d: StudyDraft): { ok: true; input: StudyInput } | { ok: false; issues: FormIssue[] } {
+  // Blank rows are dropped before validation, so a zod option index counts kept
+  // rows. This maps it back to the row the buyer sees.
+  const keptRows = d.questions.map((q) => q.options.flatMap((o, i) => (o.trim().length > 0 ? [i] : [])))
   const candidate = {
     title: d.title.trim(),
     sponsor: d.sponsor.trim(),
@@ -170,9 +176,45 @@ export function toStudyInput(d: StudyDraft): { ok: true; input: StudyInput } | {
   }
   const r = StudyInput.safeParse(candidate)
   if (r.success) return { ok: true, input: r.data }
-  // De-duplicated: `min(1)` on each option and `min(2)` on the list both fire when
-  // a question is empty, and the buyer is told the same thing twice.
-  return { ok: false, issues: Array.from(new Set(r.error.issues.map(humanIssue))) }
+  // De-duplicated per field: `min(1)` on each option and `min(2)` on the list both
+  // fire when a question is empty, and the buyer is told the same thing twice.
+  const seen = new Set<string>()
+  const issues: FormIssue[] = []
+  for (const issue of r.error.issues) {
+    const i: FormIssue = { path: fieldKey(issue.path), message: humanIssue(issue) }
+    const [head, qi, leaf, oi] = issue.path
+    if (head === 'questions' && leaf === 'options' && typeof qi === 'number' && typeof oi === 'number') {
+      const row = keptRows[qi]?.[oi]
+      if (row !== undefined) i.row = row
+    }
+    const k = `${i.path}|${i.message}`
+    if (!seen.has(k)) { seen.add(k); issues.push(i) }
+  }
+  return { ok: false, issues }
+}
+
+/** One validation failure, filed under the form field that shows it. */
+export interface FormIssue {
+  path: string
+  message: string
+  /** For an option issue that came from one row: which row on screen. Absent when it came from the list. */
+  row?: number
+}
+
+/**
+ * Which on-screen field owns a schema path. Option rows share one error line
+ * under the options list: five rows each carrying "must be at least 1 character"
+ * is one mistake said five times.
+ */
+export function fieldKey(path: ReadonlyArray<string | number>): string {
+  const [head, index, leaf] = path
+  if (head === 'questions' && typeof index === 'number' && typeof leaf === 'string') return `questions.${index}.${leaf}`
+  return String(head ?? '')
+}
+
+/** The sidebar's list: each sentence once, in the order the fields raised them. */
+export function issueMessages(issues: FormIssue[]): string[] {
+  return Array.from(new Set(issues.map((i) => i.message)))
 }
 
 /**
@@ -223,4 +265,12 @@ export function quoteForSaved(
  */
 export function targetingSurcharge(atCost: boolean): number {
   return quoteStudy({ targeted: true, atCost }).priceCents - quoteStudy({ targeted: false, atCost }).priceCents
+}
+
+/** The tier as a buyer reads it, bounds from the contract (R49). */
+export function activityTierLabel(t: 'light' | 'regular' | 'heavy'): string {
+  const { REGULAR_FROM, HEAVY_FROM } = ACTIVITY_TIER_THRESHOLDS
+  if (t === 'light') return `Light (under ${REGULAR_FROM} turns a week)`
+  if (t === 'regular') return `Regular (${REGULAR_FROM} to ${HEAVY_FROM - 1} turns a week)`
+  return `Heavy (over ${HEAVY_FROM - 1} turns a week)`
 }

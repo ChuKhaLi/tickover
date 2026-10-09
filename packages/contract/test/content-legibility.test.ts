@@ -1,15 +1,15 @@
 import { describe, it, expect } from 'vitest'
 import {
-  ATTENTION_POOL,
-  COLS_MIN,
   LAUNCH_STUDY_QUESTIONS,
+  MAX_BUDGET,
+  MIN_BUDGET,
   PROFILE_QUESTIONS,
   SPONSOR_STATUS_MAX,
-  STATUS_LINE_SAFETY_MARGIN,
-  formatStatusLine,
+  fragmentBand,
+  optionRun,
+  render,
   resolveColumns,
-  truncateToWidth,
-  type ServedQuestion,
+  showsAQuestion,
 } from '../src/index.js'
 
 /**
@@ -33,88 +33,9 @@ import {
  * budgets where a question renders with its text cut or its options stubbed -- must be empty.
  */
 describe('the shipped question content, at every width the composer can produce', () => {
-  // The full range the daemon can hand `formatStatusLine`: `resolveColumns` clamps to
-  // [COLS_MIN, COLS_MAX] and then subtracts the margin, so this is the lowest budget reachable.
-  const MIN_BUDGET = COLS_MIN - STATUS_LINE_SAFETY_MARGIN
-  // Past this every item fits with room to spare; the spike's widest captured terminal was 189.
-  const MAX_BUDGET = 200
 
-  const render = (q: { text: string; options: readonly string[] }, sponsor: string, cols: number, paid: boolean): string =>
-    formatStatusLine({
-      loggedIn: true,
-      question: {
-        assignment_id: '00000000-0000-0000-0000-000000000001', kind: paid ? 'choice' : 'profile',
-        text: q.text, options: [...q.options], context: null,
-        sponsor, price_cents: paid ? 50 : 0,
-        served_at: '2026-09-08T00:00:00.000Z', expires_at: '2026-09-08T00:05:00.000Z',
-      } satisfies ServedQuestion,
-      answered: null, todayPaid: 0, pendingCents: 0, availableCents: 0, maxColumns: cols,
-    })
-
-  /** The line the daemon shows when there is no question at all, at this width. */
-  const idleAt = (cols: number): string =>
-    formatStatusLine({ loggedIn: true, question: null, answered: null, todayPaid: 0, pendingCents: 0, availableCents: 0, maxColumns: cols })
-
-  /**
-   * A question was shown iff the composed line differs from the idle line at the same width.
-   *
-   * Compared rather than pattern-matched, because `formatStatusLine` truncates the *whole* line to
-   * the budget as its last act: below about 20 columns even the idle line comes back as
-   * `tickover · t…`, and a regex looking for "today N/M" reads that as a question and reports a
-   * fragment band that is really the idle line being narrow. Asking "is the text absent" is the
-   * other wrong way round -- it would call a truncated question a suppressed one, which is the
-   * exact case being hunted here.
-   */
-  const showsAQuestion = (line: string, cols: number) => line !== idleAt(cols) && !waitingAt(cols).includes(line)
-
-  /**
-   * What stands in for a question too narrow to disclose: "a question is waiting", with no sponsor
-   * and no question in it. It replaced the idle line there (2026-09-29), so it counts as not shown.
-   */
-  const waitingAt = (cols: number): string[] =>
-    ['tickover · question waiting · answer: tickover pane', 'tickover · question waiting'].map((w) => truncateToWidth(w, cols))
-
-  /**
-   * The options exactly as the composer lays them out: `1 Yes  2 No  3 Maybe`.
-   *
-   * Asserted as this one contiguous run rather than option by option, because a bare
-   * `line.includes('No')` is satisfied by the *question* "Pick 'No'." -- that option's check could
-   * never fail while the text was present. Smallest element that carries the claim (R99, plan 2),
-   * and it is also what actually distinguishes a whole option list from a squeezed one.
-   */
-  const optionRun = (options: readonly string[]) => options.map((o, i) => `${i + 1} ${o}`).join('  ')
-
-  /** Every budget at which a question is composed but not composed whole. */
-  function fragmentBand(q: { text: string; options: readonly string[] }, sponsor: string, paid: boolean): number[] {
-    const band: number[] = []
-    for (let cols = MIN_BUDGET; cols <= MAX_BUDGET; cols++) {
-      const line = render(q, sponsor, cols, paid)
-      if (!showsAQuestion(line, cols)) continue
-      const whole = line.includes(q.text) && line.includes(optionRun(q.options))
-      if (!whole) band.push(cols)
-    }
-    return band
-  }
-
-  // Every sponsor a buyer can produce, as seen by the composer: it caps display at
-  // SPONSOR_STATUS_MAX, so widths past that are indistinguishable from it.
-  const SPONSOR_WIDTHS = Array.from({ length: SPONSOR_STATUS_MAX - 1 }, (_, i) => i + 2)
-
-  /**
-   * The guarantee for attention checks: whole, or not shown. An attention check is the one question
-   * with a wrong answer, so it is the one worth the sharper rule -- not because the status line can
-   * be answered from (it cannot: `pane-view.ts` renders the full text and reads the keystroke), but
-   * because a half-read instruction is the only kind of display failure that could change what
-   * somebody chooses once they do open the pane.
-   */
-  it('never shows an attention check in fragments, at any width or sponsor', () => {
-    for (const q of ATTENTION_POOL) {
-      for (const width of SPONSOR_WIDTHS) {
-        const band = fragmentBand(q, 'x'.repeat(width), true)
-        expect(band, `"${q.text}" fragments at sponsor width ${width}, budgets ${band.join(',')}`).toEqual([])
-      }
-    }
-  })
+  // The attention pool is swept the same way in `packages/server/test/unit/attention-pool.test.ts`,
+  // where it moved so its answers are not published (R905).
 
   /**
    * Profile questions get the weaker half of the rule -- their *text* may be cut, since they have no
@@ -184,9 +105,6 @@ describe('the shipped question content, at every width the composer can produce'
   // the width an undetected terminal produces -- the case the whole pool exists to serve.
   it('does show every item at the default budget, so the sweep is not vacuous', () => {
     const budget = resolveColumns({})
-    for (const q of ATTENTION_POOL) {
-      expect(showsAQuestion(render(q, 'x'.repeat(SPONSOR_STATUS_MAX), budget, true), budget), `"${q.text}" is never shown at budget ${budget}`).toBe(true)
-    }
     for (const q of PROFILE_QUESTIONS) {
       expect(showsAQuestion(render(q, 'Tickover', budget, false), budget), `"${q.text}" is never shown at budget ${budget}`).toBe(true)
     }

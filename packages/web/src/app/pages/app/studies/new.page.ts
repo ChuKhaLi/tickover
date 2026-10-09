@@ -1,23 +1,26 @@
-import { Component, DestroyRef, inject, signal } from '@angular/core'
+import { Component, DestroyRef, ElementRef, inject, signal } from '@angular/core'
 import { FormsModule } from '@angular/forms'
 import { Router, RouterLink } from '@angular/router'
 import type { RouteMeta } from '@analogjs/router'
-import { LANGUAGES, PRICING, RULES, type AudienceEstimate, type StudyView } from '@tickover/contract'
+import { LANGUAGES, LANGUAGE_LABELS, OS_LABELS, PRICING, RULES, type AudienceEstimate, type StudyView } from '@tickover/contract'
 import { ApiService, newIdempotencyKey } from '../../../lib/api'
 import { AuthState, buyerGuard } from '../../../lib/auth'
 import { SITE_NAME } from '../../../lib/page-meta'
+import { previewQuestion, type PreviewSurface, type PreviewWidth } from '../../../lib/question-preview'
 import {
   MAX_OPTIONS, MAX_QUESTIONS, MIN_OPTIONS, SPONSOR_MAX, TARGETING_CAPS, TITLE_MAX,
-  emptyDraft, newQuestion, quoteFor, quoteForSaved, targetingOf, targetingSurcharge, toStudyInput, type StudyDraft,
+  activityTierLabel, emptyDraft, issueMessages, newQuestion, quoteFor, quoteForSaved, targetingOf, targetingSurcharge, toStudyInput, type FormIssue, type StudyDraft,
 } from '../../../lib/study-form'
 import { Banner } from '../../../ui/banner'
 import { Button, Link } from '../../../ui/button'
 import { Card } from '../../../ui/card'
 import { Chip } from '../../../ui/chip'
+import { CountryPicker } from '../../../ui/country-picker'
 import { Field } from '../../../ui/field'
 import { Input, Range } from '../../../ui/input'
 import { Meta } from '../../../ui/meta'
 import { Money } from '../../../ui/money'
+import { QuestionPreview } from '../../../ui/question-preview'
 import { PageHeader } from '../../../ui/page-header'
 
 // Guarded per page, not on the layout -- see `app.page.ts`. `PAGE_META` is the
@@ -32,7 +35,7 @@ export const routeMeta = { title: `${SITE_NAME} — New study`, canActivate: [bu
 export const ESTIMATE_DEBOUNCE_MS = 400
 
 @Component({
-  imports: [FormsModule, RouterLink, Banner, Button, Card, Chip, Field, Input, Link, Meta, Money, PageHeader, Range],
+  imports: [FormsModule, RouterLink, Banner, Button, Card, Chip, CountryPicker, Field, Input, Link, Meta, Money, PageHeader, QuestionPreview, Range],
   template: `
     <tk-page-header heading="New study" />
     <form class="grid gap-8 lg:grid-cols-[1fr_20rem]" (ngSubmit)="submitForReview()">
@@ -42,13 +45,13 @@ export const ESTIMATE_DEBOUNCE_MS = 400
            study while submit sent another. (No backticks in these comments: the
            template is a template literal and one would end it here, with the
            compiler pointing at the decorator instead.) -->
-      <div class="space-y-8">
-      <fieldset class="space-y-8" [disabled]="locked()">
+      <div class="min-w-0 space-y-8">
+      <fieldset class="min-w-0 space-y-8" [disabled]="locked()">
         <section class="space-y-4">
-          <tk-field label="Title (internal)">
+          <tk-field label="Title (internal)" [error]="errorFor('title')">
             <input tk-input name="title" [(ngModel)]="draft.title" [attr.maxlength]="titleMax" />
           </tk-field>
-          <tk-field label="Sponsor name shown to developers" hint="Shown in the status line with every question.">
+          <tk-field label="Sponsor name shown to developers" hint="Shown in the status line with every question." [error]="errorFor('sponsor')">
             <input tk-input name="sponsor" [(ngModel)]="draft.sponsor" [attr.maxlength]="sponsorMax" />
           </tk-field>
         </section>
@@ -60,7 +63,7 @@ export const ESTIMATE_DEBOUNCE_MS = 400
               <!-- The character count is the field's hint, not part of its label.
                    It used to sit inside the label element, which means the
                    control's accessible name changed on every keystroke. -->
-              <tk-field [label]="'Question ' + (qi + 1)" [hint]="q.text.length + ' of ' + maxQ + ' characters'">
+              <tk-field [label]="'Question ' + (qi + 1)" [hint]="q.text.length + ' of ' + maxQ + ' characters'" [error]="errorFor('questions.' + qi + '.text')">
                 <input tk-input [name]="'q' + qi" [attr.name]="'q' + qi" [(ngModel)]="q.text" [attr.maxlength]="maxQ" />
               </tk-field>
               @for (o of q.options; track $index; let oi = $index) {
@@ -68,18 +71,22 @@ export const ESTIMATE_DEBOUNCE_MS = 400
                      question, and a label over each would be five headings for one
                      list. The placeholder keeps its one honest job. -->
                 <div class="mt-2 flex items-center gap-3">
-                  <input tk-input [name]="'q' + qi + 'o' + oi" [attr.name]="'q' + qi + 'o' + oi" [attr.aria-label]="'Option ' + (oi + 1) + ' of question ' + (qi + 1)" [(ngModel)]="q.options[oi]" [attr.maxlength]="maxO" placeholder="Option {{ oi + 1 }}" />
-                  @if (q.options.length > minOptions) { <button type="button" tk-button variant="quiet" size="sm" (click)="removeOption(q, oi)">remove</button> }
+                  <input tk-input [name]="'q' + qi + 'o' + oi" [attr.name]="'q' + qi + 'o' + oi" [attr.aria-label]="'Option ' + (oi + 1) + ' of question ' + (qi + 1)" [attr.aria-invalid]="oi === optionsErrorRow(qi) && errorFor('questions.' + qi + '.options') ? 'true' : null" [attr.aria-describedby]="oi === optionsErrorRow(qi) && errorFor('questions.' + qi + '.options') ? 'q' + qi + '-options-error' : null" [(ngModel)]="q.options[oi]" [attr.maxlength]="maxO" placeholder="Option {{ oi + 1 }}" />
+                  @if (q.options.length > minOptions) { <button type="button" tk-button variant="quiet" size="sm" (click)="removeOption(q, oi)">Remove</button> }
                 </div>
               }
-              @if (q.options.length < maxOptions) { <button type="button" tk-button variant="quiet" size="sm" class="mt-2" (click)="q.options.push('')">+ option</button> }
-              <tk-field class="mt-4" label="Context shown on rich surfaces (optional)" [hint]="q.context.length + ' of ' + maxC + ' characters'">
+              @if (errorFor('questions.' + qi + '.options'); as oe) {
+                <p class="mt-1.5 max-w-[68ch] text-small text-rejected-fg dark:text-rejected-edge" [id]="'q' + qi + '-options-error'" [attr.data-options-error]="qi">{{ oe }}</p>
+              }
+              @if (q.options.length < maxOptions) { <button type="button" tk-button variant="quiet" size="sm" class="mt-2" (click)="q.options.push('')">+ Add option</button> }
+              <tk-question-preview [preview]="preview(qi)" [(width)]="previewWidth" [(surface)]="previewSurface" />
+              <tk-field class="mt-4" label="Context (optional)" [hint]="['Shown in the Tickover pane and the VS Code extension, not in the status line or the band.', q.context.length + ' of ' + maxC + ' characters']" [error]="errorFor('questions.' + qi + '.context')">
                 <textarea tk-input [name]="'c' + qi" [attr.name]="'c' + qi" [(ngModel)]="q.context" [attr.maxlength]="maxC" rows="2"></textarea>
               </tk-field>
-              @if (draft.questions.length > 1) { <button type="button" tk-button variant="quiet" size="sm" class="mt-3" (click)="draft.questions.splice(qi, 1)">remove question</button> }
+              @if (draft.questions.length > 1) { <button type="button" tk-button variant="quiet" size="sm" class="mt-3" (click)="draft.questions.splice(qi, 1)">Remove question</button> }
             </div>
           }
-          @if (draft.questions.length < maxQuestions) { <button type="button" tk-button variant="quiet" size="sm" (click)="addQuestion()">+ question</button> }
+          @if (draft.questions.length < maxQuestions) { <button type="button" tk-button variant="quiet" size="sm" (click)="addQuestion()">+ Add question</button> }
           <!-- The hold is price x questions x respondents, so a second question
                doubles the bill. Saying so beside the button is cheaper than a
                buyer discovering it in the quote. -->
@@ -93,31 +100,51 @@ export const ESTIMATE_DEBOUNCE_MS = 400
                (R49 -- a price in copy comes from the contract, and from the right
                branch of it). -->
           <h2 class="text-h2 text-ink-900 dark:text-ink-50">Targeting (+<tk-money [cents]="surcharge()" /> per response)</h2>
-          <div class="flex flex-wrap gap-2">
-            @for (l of languages; track l) {
-              <button type="button" tk-chip [selected]="draft.targeting.languages.includes(l)" (click)="toggleLanguage(l)" [disabled]="!draft.targeting.languages.includes(l) && draft.targeting.languages.length >= caps.languages">{{ l }}</button>
+          <p class="max-w-[68ch] text-small text-ink-600 dark:text-ink-400">Within a group a developer matches any choice; across groups they must match every group. Choosing an operating system leaves out developers whose system we don't know yet.</p>
+          <div role="group" aria-labelledby="tg-languages" class="space-y-2">
+            <h3 class="text-body font-semibold text-ink-900 dark:text-ink-50" id="tg-languages">Languages</h3>
+            <div class="flex flex-wrap gap-2">
+              @for (l of languages; track l) {
+                <button type="button" tk-chip [selected]="draft.targeting.languages.includes(l)" (click)="toggleLanguage(l)" [disabled]="!draft.targeting.languages.includes(l) && draft.targeting.languages.length >= caps.languages">{{ languageLabels[l] }}</button>
+              }
+            </div>
+            <!-- The page offers 23 chips for a field the contract takes 10 of. Left
+                 unenforced the eleventh click is a 400 the audience panel cannot
+                 explain, so the cap is stated before it is reached and the chips
+                 past it are not clickable. The number comes from the schema. -->
+            @if (draft.targeting.languages.length >= caps.languages) {
+              <p class="max-w-[68ch] text-small text-ink-600 dark:text-ink-400">{{ draft.targeting.languages.length }} of {{ caps.languages }} languages selected. You can target at most {{ caps.languages }} languages, so deselect one to choose another.</p>
             }
           </div>
-          <!-- The page offers 23 chips for a field the contract takes 10 of. Left
-               unenforced the eleventh click is a 400 the audience panel cannot
-               explain, so the cap is stated before it is reached and the chips
-               past it are not clickable. The number comes from the schema. -->
-          @if (draft.targeting.languages.length >= caps.languages) {
-            <p class="max-w-[68ch] text-small text-ink-600 dark:text-ink-400">{{ draft.targeting.languages.length }} of {{ caps.languages }} languages selected. You can target at most {{ caps.languages }} languages, so deselect one to choose another.</p>
-          }
-          <tk-field class="max-w-md" label="Countries (ISO codes, comma separated)" [hint]="countriesOverCap() ? '' : 'At most ' + caps.countries + '.'" [error]="countriesOverCap() ? 'You can target at most ' + caps.countries + ' countries; the rest are ignored.' : ''">
-            <input tk-input name="countries" [ngModel]="countriesText" (ngModelChange)="onCountries($event)" placeholder="US, GB" />
-          </tk-field>
-          <div class="flex flex-wrap gap-2">
-            @for (t of tiers; track t) { <button type="button" tk-chip [selected]="draft.targeting.activityTiers.includes(t)" (click)="toggleTier(t)">{{ t }}</button> }
-            @for (o of oses; track o) { <button type="button" tk-chip [selected]="draft.targeting.os.includes(o)" (click)="toggleOs(o)">{{ o }}</button> }
+          <div role="group" aria-labelledby="tg-countries" class="space-y-2">
+            <h3 class="text-body font-semibold text-ink-900 dark:text-ink-50" id="tg-countries">Countries</h3>
+            <tk-country-picker [value]="draft.targeting.countries" (valueChange)="onCountries($event)" [cap]="caps.countries" [disabled]="locked()" />
+          </div>
+          <div role="group" aria-labelledby="tg-activity" class="space-y-2">
+            <h3 class="text-body font-semibold text-ink-900 dark:text-ink-50" id="tg-activity">Activity</h3>
+            <div class="flex flex-wrap gap-2">@for (t of tiers; track t) { <button type="button" tk-chip [selected]="draft.targeting.activityTiers.includes(t)" (click)="toggleTier(t)">{{ tierLabel(t) }}</button> }</div>
+          </div>
+          <div role="group" aria-labelledby="tg-os" class="space-y-2">
+            <h3 class="text-body font-semibold text-ink-900 dark:text-ink-50" id="tg-os">Operating system</h3>
+            <div class="flex flex-wrap gap-2">@for (o of oses; track o) { <button type="button" tk-chip [selected]="draft.targeting.os.includes(o)" (click)="toggleOs(o)">{{ osLabels[o] }}</button> }</div>
           </div>
         </section>
 
         <section>
-          <label class="block max-w-md"><span class="text-small text-ink-600 dark:text-ink-400">Respondents: {{ draft.targetCount }}</span><input name="target" type="range" tk-range [min]="minR" [max]="maxR" step="10" [ngModel]="draft.targetCount" (ngModelChange)="onTargetCount($event)" class="mt-2 w-full" /></label>
+          <div class="flex max-w-md flex-col gap-2">
+            <label for="target-count" class="text-small font-medium text-ink-800 dark:text-ink-100">Respondents</label>
+            <div class="flex items-center gap-3">
+              <input name="target" type="range" tk-range aria-label="Respondents" [min]="minR" [max]="maxR" step="10" [ngModel]="draft.targetCount" (ngModelChange)="onTargetCount($event)" class="w-full" />
+              <input id="target-count" tk-input size="sm" name="targetCount" type="number" inputmode="numeric" [min]="minR" [max]="maxR" step="1" [ngModel]="draft.targetCount" (ngModelChange)="onTargetTyped($event)" [attr.aria-invalid]="errorFor('target_count') ? 'true' : null" [attr.aria-describedby]="errorFor('target_count') ? 'target-count-error' : null" class="w-24" />
+            </div>
+            @if (errorFor('target_count'); as te) { <p id="target-count-error" class="text-small text-rejected-fg dark:text-rejected-edge">{{ te }}</p> }
+          </div>
           @if (estimate(); as e) {
             <p tk-meta class="mt-2"><span>{{ e.reachable_developers }} reachable developers</span><span>{{ e.estimated_fill_hours === null ? 'no estimate yet' : 'about ' + e.estimated_fill_hours + ' hours to fill' }}</span></p>
+            @if (e.reachable_developers === 0) {
+              <!-- A line, not tk-banner: banner is role=alert, and a standing state is not an interruption. -->
+              <p data-zero-audience class="mt-2 max-w-[68ch] text-small text-review-fg dark:text-review-edge">{{ targeted() ? 'No developer matches this targeting right now, so the study would not fill.' : 'No developers are active on Tickover yet, so the study would not fill.' }}</p>
+            }
           } @else if (estimateFailed()) {
             <!-- Spec 6.7 puts this figure in front of the buyer before they pay.
                  A panel that just disappears is indistinguishable from the
@@ -146,7 +173,7 @@ export const ESTIMATE_DEBOUNCE_MS = 400
         </section>
       </div>
 
-      <aside tk-card pad="lg" class="h-fit text-small">
+      <aside tk-card pad="lg" class="h-fit text-small lg:sticky lg:top-6">
         <h2 class="text-h3 text-ink-900 dark:text-ink-50">Quote</h2>
         @if (quote(); as q) {
           <dl class="mt-3 space-y-1">
@@ -164,7 +191,7 @@ export const ESTIMATE_DEBOUNCE_MS = 400
              number is what is charged. Saying so here keeps the panel a quote
              rather than a promise. -->
         <p class="mt-3 max-w-[68ch] text-small text-ink-600 dark:text-ink-400">Confirmed when the study is submitted; the hold is released for any response that never arrives.</p>
-        @if (issues().length) { <ul class="mt-3 list-disc pl-5 text-rejected-fg dark:text-rejected-edge">@for (i of issues(); track i) { <li>{{ i }}</li> }</ul> }
+        @if (issueList().length) { <ul class="mt-3 list-disc pl-5 text-rejected-fg dark:text-rejected-edge">@for (i of issueList(); track i) { <li>{{ i }}</li> }</ul> }
         <!-- Two failures, two sentences. One string covering both told a buyer
              whose study had been saved that it had not been, and the retry it
              invited created a second paid study. -->
@@ -187,10 +214,11 @@ export default class NewStudyPage {
 
   draft: StudyDraft = emptyDraft()
   policyAccepted = false
-  /** What the buyer typed, kept apart from the codes parsed out of it. */
-  countriesText = ''
 
   languages = LANGUAGES
+  languageLabels = LANGUAGE_LABELS
+  osLabels = OS_LABELS
+  tierLabel = activityTierLabel
   tiers = ['light', 'regular', 'heavy'] as const
   oses = ['win32', 'darwin', 'linux'] as const
   maxQ = RULES.QUESTION_TEXT_MAX; maxO = RULES.OPTION_TEXT_MAX; maxC = RULES.CONTEXT_MAX
@@ -199,7 +227,51 @@ export default class NewStudyPage {
   minR = PRICING.MIN_RESPONDENTS; maxR = PRICING.MAX_RESPONDENTS
   caps = TARGETING_CAPS
 
-  issues = signal<string[]>([])
+  private host = inject(ElementRef<HTMLElement>)
+  /** D2: one width and one surface for every card, so comparing questions is one click. */
+  previewWidth = signal<PreviewWidth>(80)
+  previewSurface = signal<PreviewSurface>('status')
+  preview(qi: number) { return previewQuestion(this.draft.questions[qi]!, this.draft.sponsor, this.quote().developerCents) }
+
+  /** Errors appear at fields only after the buyer has tried to save or submit. */
+  attempted = signal(false)
+  /** Submit was pressed with the review policy unticked; the sentence goes when the box is ticked. */
+  private policyAttempted = signal(false)
+  private issueCache: { key: string; issues: FormIssue[] } | undefined
+
+  /**
+   * R810: derived from the draft on every pass once the buyer has attempted, never a
+   * snapshot of the last attempt. A snapshot keyed by question position left a corrected
+   * field red and, when a question was removed, put its errors on the wrong question.
+   * `toStudyInput` is pure, so this costs one parse per change of the draft.
+   */
+  issues(): FormIssue[] {
+    const out: FormIssue[] = []
+    if (this.attempted()) {
+      const key = JSON.stringify(this.draft)
+      if (this.issueCache?.key !== key) {
+        const r = toStudyInput(this.draft)
+        this.issueCache = { key, issues: r.ok ? [] : r.issues }
+      }
+      out.push(...this.issueCache.issues)
+    }
+    if (this.policyAttempted() && !this.policyAccepted) out.push({ path: 'policy', message: 'Accept the review policy before submitting.' })
+    return out
+  }
+
+  errorFor(key: string): string {
+    return this.issues().filter((i) => i.path === key).map((i) => i.message).join(' ')
+  }
+  /** The row that carries the flag: the offending one, or the first when the list itself is short. */
+  optionsErrorRow(qi: number): number {
+    return this.issues().find((i) => i.path === 'questions.' + qi + '.options' && i.row !== undefined)?.row ?? 0
+  }
+  issueList(): string[] { return issueMessages(this.issues()) }
+
+  /** After the render that marks the fields invalid, not before it. */
+  private focusFirstInvalid(): void {
+    setTimeout(() => (this.host.nativeElement.querySelector('[aria-invalid="true"]') as HTMLElement | null)?.focus(), 0)
+  }
   createFailed = signal(false)
   submitFailed = signal(false)
   busy = signal(false)
@@ -262,15 +334,15 @@ export default class NewStudyPage {
     return saved ? quoteForSaved(saved, firstStudyUsed) : quoteFor(this.draft, firstStudyUsed)
   }
 
+  /** Whether the draft narrows the audience at all: with no targeting, "this targeting" names nothing. */
+  targeted() { return targetingOf(this.draft) !== undefined }
+
   /** An unknown buyer is quoted the full price: overstating is the safe direction. */
   surcharge() { return targetingSurcharge(!(this.auth.buyer()?.first_study_used ?? true)) }
 
   toggleLanguage(l: string): void { this.toggleCapped(this.draft.targeting.languages, l, this.caps.languages) }
   toggleTier(t: StudyDraft['targeting']['activityTiers'][number]): void { this.toggleCapped(this.draft.targeting.activityTiers, t, this.caps.activityTiers) }
   toggleOs(o: StudyDraft['targeting']['os'][number]): void { this.toggleCapped(this.draft.targeting.os, o, this.caps.os) }
-
-  /** Read off the field every time it is asked, so no later click can wipe it. */
-  countriesOverCap(): boolean { return this.splitCodes(this.countriesText).length > this.caps.countries }
 
   /**
    * Deselecting is always allowed; selecting past the contract's cap is not.
@@ -285,23 +357,28 @@ export default class NewStudyPage {
     this.refreshEstimate()
   }
 
-  /**
-   * Two ASCII letters, not any two characters: `U1` and `1!` are typos, and the
-   * contract's `length(2)` accepts both. It still accepts `ZZ` and `QQ`, which
-   * are real ISO user-assigned codes and target nobody -- narrowing that needs a
-   * country list, which belongs in the contract rather than here.
-   */
-  splitCodes(s: string): string[] { return s.split(',').map((c) => c.trim().toUpperCase()).filter((c) => /^[A-Z]{2}$/.test(c)) }
-
-  onCountries(typed: string): void {
-    this.countriesText = typed
-    this.draft.targeting.countries = this.splitCodes(typed).slice(0, this.caps.countries)
+  onCountries(codes: string[]): void {
+    this.draft.targeting.countries = codes
     this.refreshEstimate()
   }
 
   onTargetCount(count: number): void {
     this.draft.targetCount = Number(count)
     this.refreshEstimate()
+  }
+
+  /**
+   * D5: a count outside the contract's range is a keystroke in progress, not a question for the server.
+   * R813: and it stays as typed. Pressing Submit takes focus off this field first, so a clamp
+   * when it lost focus rewrote the count and the hold was placed on a number the buyer never saw; now the field
+   * shows its error and nothing is sent. A non-integer (75.5 pasted over 100) is stored too, not
+   * skipped: skipping left the field showing 75.5 while the draft held 100, and the hold was
+   * placed on the 100.
+   */
+  onTargetTyped(v: number | string): void {
+    const n = Number(v)
+    this.draft.targetCount = n
+    if (Number.isInteger(n) && n >= this.minR && n <= this.maxR) this.refreshEstimate()
   }
 
   addQuestion(): void { this.draft.questions.push(newQuestion()) }
@@ -315,9 +392,14 @@ export default class NewStudyPage {
    * population and quietly ignore every chip just clicked.
    */
   private async loadEstimate(): Promise<void> {
+    // Every path that asks (chips, countries, the count field, the timer armed
+    // before a later keystroke) comes through here, so the range is held here:
+    // a count the buyer is still typing would only earn a 400 and the banner.
+    const count = Number(this.draft.targetCount)
+    if (!(Number.isInteger(count) && count >= this.minR && count <= this.maxR)) return
     const targeting = targetingOf(this.draft)
     try {
-      this.estimate.set(await this.api.estimate({ targeting, target_count: Number(this.draft.targetCount) }))
+      this.estimate.set(await this.api.estimate({ targeting, target_count: count }))
       this.estimateFailed.set(false)
     } catch {
       // Advisory, so it must not stop the buyer writing the study -- but it is
@@ -349,8 +431,7 @@ export default class NewStudyPage {
     if (already) return already
     if (this.createInFlight) return this.createInFlight
     const r = toStudyInput(this.draft)
-    if (!r.ok) { this.issues.set(r.issues); return null }
-    this.issues.set([])
+    if (!r.ok) { this.attempted.set(true); this.focusFirstInvalid(); return null }
     // The contract input, not the draft: whitespace and blank option rows are already
     // gone, so two attempts that differ only in those are the same study and share a key.
     const attempt = JSON.stringify(r.input)
@@ -393,7 +474,7 @@ export default class NewStudyPage {
     // and mints a utility from any word that is one. Two rules were shipped from
     // this comment before it was reworded -- see R47.)
     if (!this.policyAccepted) {
-      this.issues.set(['Accept the review policy before submitting.'])
+      this.policyAttempted.set(true)
       return
     }
     this.busy.set(true)

@@ -160,3 +160,33 @@ export function formatStatusLine(i: StatusInput): string {
   // unconditional (R17): the budgeting above is arithmetic, and this is the net under it.
   return truncateToWidth(line, max)
 }
+
+/**
+ * The band's first row before the question: sponsor and amount (section 4.7), capped exactly as the
+ * status line caps them. Here rather than in the daemon so the buyer's preview draws the header the
+ * daemon sends, not a copy of it.
+ */
+export function bandHeader(q: Pick<ServedQuestion, 'kind' | 'sponsor' | 'price_cents'>): string {
+  return q.kind === 'profile'
+    ? 'tickover · unpaid · panel profile'
+    : `tickover · ${truncateToWidth(sanitizeText(q.sponsor, 30), SPONSOR_STATUS_MAX)} · ${money(q.price_cents)}`
+}
+
+/**
+ * The narrowest body the band draws in. +2 for the bullet and its space, drawn before the header:
+ * the row is `● header · text` (packages/plugin/hooks/band.tsx). At +1 a greedy wrap put the amount
+ * on row 2, which section 4.7 forbids; more than +2 hides the band where it could draw.
+ */
+export function bandMinColumns(header: string): number { return displayWidth(header) + 2 }
+
+/**
+ * The two rows the band draws: `● header · text`, then the numbered options and Skip. Text and
+ * options are sanitised as the daemon sanitises them for the module (composeBand). The module,
+ * packages/plugin/hooks/band.tsx, cannot import the contract, so these rows are the reference its
+ * output is held to and the one the buyer's preview draws.
+ */
+export function bandRows(q: Pick<ServedQuestion, 'kind' | 'sponsor' | 'price_cents' | 'text' | 'options'>): [string, string] {
+  const text = sanitizeText(q.text, RULES.QUESTION_TEXT_MAX)
+  const options = q.options.map((o, i) => `${i + 1}: ${sanitizeText(o, RULES.OPTION_TEXT_MAX)}`).join('   ')
+  return [`● ${bandHeader(q)} · ${text}`, `  ${options}   0: Skip`]
+}

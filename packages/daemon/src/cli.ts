@@ -1,7 +1,6 @@
 process.removeAllListeners('warning')
 process.on('warning', (w) => { if (w.name !== 'ExperimentalWarning') console.error(w) })
 
-import { spawn } from 'node:child_process'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -13,6 +12,7 @@ import { runLoginCli } from './login.js'
 import { runPane } from './pane.js'
 import { installStatusLine, restoreStatusLine, setMods } from './statusline-install.js'
 import { statusReport } from './status-report.js'
+import { openInBrowser } from './open-url.js'
 import { ServerClient, ServerError } from './server-client.js'
 
 const [, , command = 'help', ...rest] = process.argv
@@ -48,27 +48,6 @@ const USAGE = `usage: tickover <command>
   register              record the daemon's path so the hooks can restart it
   version`
 
-/**
- * Best-effort "open this in the developer's browser". Every failure mode -- no opener installed
- * (a bare Linux box, a container), the opener refusing, spawn throwing -- is silent, because the
- * URL has already been printed to stdout by the time this runs and that is the part that matters.
- *
- * The URL is safe to hand to `cmd /c start`, whose argument parsing would otherwise be an
- * injection surface: every character in it comes from a numeric port and a base64url token
- * ([A-Za-z0-9_-]), and encodeURIComponent covers the token regardless.
- */
-function openInBrowser(url: string): void {
-  const [cmd, args] = process.platform === 'win32'
-    ? ['cmd', ['/c', 'start', '', url]]
-    : process.platform === 'darwin'
-      ? ['open', [url]]
-      : ['xdg-open', [url]]
-  try {
-    const child = spawn(cmd as string, args as string[], { detached: true, stdio: 'ignore', windowsHide: true })
-    child.on('error', () => { /* no opener on this machine -- the printed URL is the fallback */ })
-    child.unref()
-  } catch { /* same */ }
-}
 
 
 /**

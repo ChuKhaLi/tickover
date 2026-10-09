@@ -526,7 +526,8 @@ const MEASURE = 'max-w-[68ch]'
 const NARROWER = ['max-w-[24ch]', 'max-w-md', 'max-w-sm', 'max-w-xs']
 
 /**
- * A heading below the page title has two treatments, and there is no third.
+ * A heading below the page title has three treatments, and there is no fourth. The
+ * third, R385, is the label of a group inside a section rather than a level of its own.
  *
  * The rule design system 4 now states: **a section of the page is `text-h2`; a
  * heading inside a card or panel is `text-h3`.** Both are `<h2>` elements -- the
@@ -549,6 +550,10 @@ const NARROWER = ['max-w-[24ch]', 'max-w-md', 'max-w-sm', 'max-w-xs']
 const HEADING_TREATMENTS = [
   'text-h2 text-ink-900 dark:text-ink-50',
   'text-h3 text-ink-900 dark:text-ink-50',
+  // R385: the label of one group of controls inside a section or card -- the targeting
+  // groups (Languages, Countries, ...) -- which is a step below the card's own title so
+  // that it does not read as a sibling of "Quote". Body size, semibold, same ink.
+  'text-body font-semibold text-ink-900 dark:text-ink-50',
   // The one exception, and it is about a single destructive action rather than about
   // a level: settings' delete-account panel is titled in the error voice, which is
   // the same treatment every other irreversible thing on that page uses.
@@ -596,7 +601,7 @@ describe('a heading below the page title', () => {
     }
   }
 
-  it('is one of the two treatments the system has, and never a third', () => {
+  it('is one of the three treatments the system has, and never a fourth', () => {
     const strays = [...found].filter(([cls]) => !HEADING_TREATMENTS.includes(cls))
     expect(
       strays.map(([cls, files]) => `${cls} — in ${[...new Set(files)].join(', ')}`).sort(),
@@ -608,6 +613,14 @@ describe('a heading below the page title', () => {
     expect(found.size, 'no headings found, so the check above proved nothing').toBeGreaterThan(0)
     expect([...found.keys()]).toContain(HEADING_TREATMENTS[0])
     expect([...found.keys()]).toContain(HEADING_TREATMENTS[1])
+  })
+
+  it('has the group label in use, so the third treatment is not an allowance nobody takes', () => {
+    const group = HEADING_TREATMENTS[2]!
+    expect(found.get(group), 'no group label uses it').toBeDefined()
+    // The four targeting groups on the new-study form, and nothing that is a card title.
+    expect([...new Set(found.get(group))]).toEqual(['pages/app/studies/new.page.ts'])
+    expect(found.get(group)!.length).toBe(4)
   })
 })
 

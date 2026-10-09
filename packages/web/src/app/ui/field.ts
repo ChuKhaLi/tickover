@@ -1,4 +1,4 @@
-import { Component, contentChild, effect, input } from '@angular/core'
+import { Component, computed, contentChild, effect, input } from '@angular/core'
 import { Input as MwInput } from './input'
 
 let seq = 0
@@ -29,15 +29,17 @@ let seq = 0
       <ng-content />
     </label>
     @if (error()) {
-      <p [id]="id + '-msg'" class="mt-1.5 text-small text-rejected-fg dark:text-rejected-edge">{{ error() }}</p>
-    } @else if (hint()) {
-      <p [id]="id + '-msg'" class="mt-1.5 text-small text-ink-600 dark:text-ink-400">{{ hint() }}</p>
+      <p [id]="id + '-msg'" class="mt-1.5 max-w-[68ch] text-small text-rejected-fg dark:text-rejected-edge">{{ error() }}</p>
+    } @else if (hintLines().length) {
+      <p [id]="id + '-msg'" class="mt-1.5 max-w-[68ch] text-small text-ink-600 dark:text-ink-400">@for (line of hintLines(); track $index) { <span class="block">{{ line }}</span> }</p>
     }`,
   host: { class: 'block' },
 })
 export class Field {
   label = input.required<string>()
-  hint = input<string>('')
+  /** One description; a list is its lines, each on its own row, and still one aria-describedby target. */
+  hint = input<string | string[]>('')
+  hintLines = computed(() => [this.hint()].flat().filter(Boolean))
   error = input<string>('')
 
   /** Stable within a render, and unique across fields on a page. */
@@ -52,7 +54,7 @@ export class Field {
       // Set rather than bound: the control belongs to the caller's template, so
       // there is no binding to put these on without taking the element over.
       el.setAttribute('id', this.id)
-      const described = this.error() || this.hint()
+      const described = this.error() || this.hintLines().length
       if (described) el.setAttribute('aria-describedby', `${this.id}-msg`)
       else el.removeAttribute('aria-describedby')
       // A field in error says so to assistive technology, not only in colour.

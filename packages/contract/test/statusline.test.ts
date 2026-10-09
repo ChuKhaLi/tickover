@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import stringWidth from 'string-width'
-import { formatStatusLine, resolveColumns, truncateToWidth } from "../src/index.js"
+import { bandHeader, bandMinColumns, bandRows, formatStatusLine, resolveColumns, truncateToWidth } from "../src/index.js"
 
 const q = (over: Partial<Parameters<typeof formatStatusLine>[0]['question'] & object> = {}) => ({
   assignment_id: '8f0b0f2e-6f6a-4a3a-9c1f-0f1e2d3c4b5a', kind: 'choice' as const, text: 'Which tagline?',
@@ -273,5 +273,36 @@ describe('formatStatusLine invariants', () => {
     // could all pass vacuously on a body that only ever took one branch.
     expect({ sawWhole: sawWhole > 0, sawHint: sawHint > 0, sawIdle: sawIdle > 0 })
       .toEqual({ sawWhole: true, sawHint: true, sawIdle: true })
+  })
+})
+
+describe('bandHeader', () => {
+  const bq = { kind: 'choice' as const, sponsor: 'Acme DB', price_cents: 50 }
+  it('is the sponsor and amount, capped as the status line caps it', () => {
+    expect(bandHeader(bq)).toBe('tickover · Acme DB · $0.50')
+    expect(bandHeader({ ...bq, sponsor: 'A very long sponsor name indeed' })).toBe('tickover · A very long spo… · $0.50')
+    expect(bandHeader({ kind: 'profile', sponsor: 'Tickover', price_cents: 0 })).toBe('tickover · unpaid · panel profile')
+  })
+  it('needs two columns past the header for the bullet', () => {
+    expect(bandMinColumns('tickover · Acme DB · $0.50')).toBe(28)
+  })
+  // D4: the status line composes its own prefix. This is what keeps the two equal.
+  it('matches the status line prefix', () => {
+    for (const s of [q(bq), q({ kind: 'profile', sponsor: 'Tickover', price_cents: 0 })]) {
+      const line = formatStatusLine({ loggedIn: true, question: s, answered: null, todayPaid: 0, pendingCents: 0, availableCents: 0, maxColumns: 200 })
+      expect(line.startsWith(`${bandHeader(s)} · `), line).toBe(true)
+    }
+  })
+})
+
+describe('bandRows', () => {
+  it('is the two rows the band draws, literally', () => {
+    expect(bandRows({ kind: 'choice', sponsor: 'Acme DB', price_cents: 50, text: 'Which DB?', options: ['Postgres', 'SQLite', 'MySQL'] }))
+      .toEqual(['● tickover · Acme DB · $0.50 · Which DB?', '  1: Postgres   2: SQLite   3: MySQL   0: Skip'])
+  })
+  it('sanitises text and options as the daemon does', () => {
+    const [row1, row2] = bandRows({ kind: 'profile', sponsor: 'Tickover', price_cents: 0, text: 'Which\tDB?  ', options: ['A\nB', 'C'] })
+    expect(row1).toBe('● tickover · unpaid · panel profile · Which DB?')
+    expect(row2).toBe('  1: A B   2: C   0: Skip')
   })
 })

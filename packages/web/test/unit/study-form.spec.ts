@@ -1,11 +1,20 @@
 import { describe, it, expect } from 'vitest'
-import { LANGUAGES, PRICING, QuestionInput, RULES, StudyInput, Targeting } from '@tickover/contract'
+import { ACTIVITY_TIER_THRESHOLDS, LANGUAGES, PRICING, QuestionInput, RULES, StudyInput, Targeting } from '@tickover/contract'
 import {
   MAX_OPTIONS, MAX_QUESTIONS, MIN_OPTIONS, SPONSOR_MAX, TARGETING_CAPS, TITLE_MAX,
-  emptyDraft, quoteFor, quoteForSaved, targetingOf, targetingSurcharge, toStudyInput,
+  activityTierLabel, emptyDraft, fieldKey, issueMessages, quoteFor, quoteForSaved, targetingOf, targetingSurcharge, toStudyInput, type FormIssue,
 } from '../../src/app/lib/study-form'
 
 describe('study form', () => {
+  it('describes each activity tier with the bounds the server classifies by', () => {
+    const { REGULAR_FROM, HEAVY_FROM } = ACTIVITY_TIER_THRESHOLDS
+    expect(activityTierLabel('light')).toBe(`Light (under ${REGULAR_FROM} turns a week)`)
+    expect(activityTierLabel('regular')).toBe(`Regular (${REGULAR_FROM} to ${HEAVY_FROM - 1} turns a week)`)
+    expect(activityTierLabel('heavy')).toBe(`Heavy (over ${HEAVY_FROM - 1} turns a week)`)
+    // And the literals, so a threshold change is seen here rather than followed silently.
+    expect(activityTierLabel('regular')).toBe('Regular (5 to 20 turns a week)')
+  })
+
   it('validates and converts a draft', () => {
     const d = emptyDraft()
     d.title = 'Tagline test'; d.sponsor = 'Acme DB'; d.targetCount = 100
@@ -28,19 +37,56 @@ describe('study form', () => {
     const r = toStudyInput(d)
     expect(r.ok).toBe(false)
     if (!r.ok) {
-      expect(r.issues).toContain('Title must be at least 3 characters.')
-      expect(r.issues).toContain('Sponsor name must be at least 2 characters.')
-      expect(r.issues).toContain('Respondents must be at least 50.')
-      expect(r.issues).toContain('Question 1 must be at least 5 characters.')
-      expect(r.issues).toContain('Question 1 must have at least 2 options.')
+      const messages = issueMessages(r.issues)
+      expect(messages).toContain('Title must be at least 3 characters.')
+      expect(messages).toContain('Sponsor name must be at least 2 characters.')
+      expect(messages).toContain('Respondents must be at least 50.')
+      expect(messages).toContain('Question 1 must be at least 5 characters.')
+      expect(messages).toContain('Question 1 must have at least 2 options.')
       // Said once, not once per empty option row.
-      expect(r.issues).toHaveLength(new Set(r.issues).size)
-      for (const issue of r.issues) {
+      expect(messages).toHaveLength(new Set(messages).size)
+      for (const issue of messages) {
         expect(issue, 'a schema path reached the buyer').not.toMatch(/questions\.\d|target_count|\btargeting\./)
         expect(issue, "zod's own wording reached the buyer").not.toMatch(/String must contain|Number must be|Array must contain/)
         expect(issue, 'not a sentence').toMatch(/^[A-Z].*\.$/)
       }
     }
+  })
+
+  it('says which field each issue belongs to', () => {
+    const d = emptyDraft()
+    d.title = 'x'
+    const r = toStudyInput(d)
+    expect(r.ok).toBe(false)
+    if (r.ok) return
+    const at = (key: string) => r.issues.filter((i: FormIssue) => i.path === key).map((i) => i.message)
+    expect(at('title')).toEqual(['Title must be at least 3 characters.'])
+    expect(at('questions.0.text')).toEqual(['Question 1 must be at least 5 characters.'])
+    // Both the per-option min(1) and the list's min(2) land on the options group, once each.
+    expect(at('questions.0.options')).toContain('Question 1 must have at least 2 options.')
+    expect(new Set(r.issues.map((i) => `${i.path}|${i.message}`)).size).toBe(r.issues.length)
+  })
+
+  it('files an option-row issue under its question options', () => {
+    expect(fieldKey(['questions', 2, 'options', 4])).toBe('questions.2.options')
+    expect(fieldKey(['questions', 0, 'context'])).toBe('questions.0.context')
+    expect(fieldKey(['targeting', 'countries', 0])).toBe('targeting')
+    expect(fieldKey(['target_count'])).toBe('target_count')
+  })
+
+  it('records which draft row an option issue came from, past the blank rows that are dropped', () => {
+    const d = emptyDraft()
+    d.title = 'Tagline test'; d.sponsor = 'Acme'; d.targetCount = 50
+    // Row 1 is blank and is filtered out before validation, so zod sees the
+    // long option at index 1 while the buyer sees it on row 2.
+    d.questions = [{ text: 'Which tagline?', options: ['A', '', 'x'.repeat(RULES.OPTION_TEXT_MAX + 1)], context: '' }]
+    const r = toStudyInput(d)
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.issues.find((i) => i.path === 'questions.0.options')!.row).toBe(2)
+    d.questions = [{ text: 'Which tagline?', options: ['A'], context: '' }]
+    const short = toStudyInput(d)
+    expect(short.ok).toBe(false)
+    if (!short.ok) expect(short.issues.find((i) => i.path === 'questions.0.options')!.row).toBeUndefined()
   })
 
   it('names every question, option and limit the buyer could trip over', () => {
@@ -54,15 +100,16 @@ describe('study form', () => {
     const r = toStudyInput(d)
     expect(r.ok).toBe(false)
     if (!r.ok) {
-      expect(r.issues).toContain('Title must be 80 characters or fewer.')
-      expect(r.issues).toContain('Sponsor name must be 30 characters or fewer.')
-      expect(r.issues).toContain('Respondents must be 500 or fewer.')
+      const messages = issueMessages(r.issues)
+      expect(messages).toContain('Title must be 80 characters or fewer.')
+      expect(messages).toContain('Sponsor name must be 30 characters or fewer.')
+      expect(messages).toContain('Respondents must be 500 or fewer.')
       // The second question is named as the second, not as index 1.
-      expect(r.issues).toContain('Question 2 must be 120 characters or fewer.')
-      expect(r.issues).toContain('Question 2, option 1 must be 40 characters or fewer.')
-      expect(r.issues).toContain('Question 2 context must be 200 characters or fewer.')
+      expect(messages).toContain('Question 2 must be 120 characters or fewer.')
+      expect(messages).toContain('Question 2, option 1 must be 40 characters or fewer.')
+      expect(messages).toContain('Question 2 context must be 200 characters or fewer.')
       // The first question is fine and is not mentioned.
-      expect(r.issues.some((i) => i.startsWith('Question 1'))).toBe(false)
+      expect(messages.some((i) => i.startsWith('Question 1'))).toBe(false)
     }
   })
 
@@ -199,14 +246,14 @@ describe('study form', () => {
     d.questions[0] = { text: over(RULES.QUESTION_TEXT_MAX), options: ['A', 'B'], context: '' }
     const long = toStudyInput(d)
     expect(long.ok).toBe(false)
-    if (!long.ok) expect(long.issues).toContain('Question 1 must be 120 characters or fewer.')
+    if (!long.ok) expect(issueMessages(long.issues)).toContain('Question 1 must be 120 characters or fewer.')
 
     d.questions[0] = { text: 'Which tagline?', options: [over(RULES.OPTION_TEXT_MAX), 'B'], context: over(RULES.CONTEXT_MAX) }
     const both = toStudyInput(d)
     expect(both.ok).toBe(false)
     if (!both.ok) {
-      expect(both.issues).toContain('Question 1, option 1 must be 40 characters or fewer.')
-      expect(both.issues).toContain('Question 1 context must be 200 characters or fewer.')
+      expect(issueMessages(both.issues)).toContain('Question 1, option 1 must be 40 characters or fewer.')
+      expect(issueMessages(both.issues)).toContain('Question 1 context must be 200 characters or fewer.')
     }
   })
 })

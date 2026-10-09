@@ -63,20 +63,9 @@ function stylesheet(): string {
  * names the offending variable. The two split the work — this one says the size moved
  * and to account for it, that one says the size moved for a reason that is not allowed.
  */
-// 26_993 -> 26_937, -56, for the CLS fix round 2 (R384, task 6 re-review finding): the caret's
-// anchor moved from the padded/bordered prompt box to a tight `relative` wrapper span around just
-// its own three spans, which fixed the caret sitting 8px short of the typed text (the box's
-// padding the old anchor never accounted for) and let `.tk-caret`'s own CSS rule -- which already
-// declared position/top/left -- be the caret's only source of those three, dropping the redundant
-// `absolute top-0 left-0` Tailwind classes from the markup. Diffed rule by rule against a build of
-// fix round 1's commit (dcd3ed1) in a scratch worktree: `.absolute` (28B), `.left-0` (15B) and
-// `.top-0` (13B) are the whole delta, all now unused, and nothing else moved.
-// 26_937 -> 27_085, +148, for the final review's I1 (R384): the hero's play control keeps one
-// width whatever its label reads, so a label change the visitor did not make can no longer wrap
-// its row and move the page. Diffed rule by rule against a clean build of 1638b18 in a scratch
-// worktree: `.tk-stack` (50B), `.tk-stack>*` (26B) and `.tk-stack>[data-sizer]:after` (72B) are the
-// whole delta; nothing else moved (the I2 wrapper's `whitespace-pre` was already in the sheet).
-const BASELINE_BYTES = 27_085
+// Every movement of this number, each one measured and attributed, is an entry in the baseline log
+// named below; the newest is the log's last one. None is restated here (R382).
+const BASELINE_BYTES = 27_589
 
 /**
  * Every earlier movement of this number, attributed to the byte, is in
