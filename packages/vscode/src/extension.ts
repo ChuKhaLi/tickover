@@ -1,9 +1,9 @@
 import * as vscode from 'vscode'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { answerNotice, isEarning, money } from '@tickover/contract'
+import { answerNotice, isEarning } from '@tickover/contract'
 import { DaemonClient, type QuestionView } from './daemon-client.js'
-import { statusBarText, quickPickItems } from './format.js'
+import { statusBarText, quickPickItems, quickPickTitle, quickPickPlaceholder } from './format.js'
 
 export const ANSWERED_TTL_MS = 10_000
 const RETRY_MS = Number(process.env.TICKOVER_RETRY_MS ?? 10_000)
@@ -83,7 +83,7 @@ export function activate(context: vscode.ExtensionContext): { client: DaemonClie
   context.subscriptions.push(vscode.commands.registerCommand('tickover.answer', async () => {
     const q = view?.question
     if (!q) { vscode.window.showInformationMessage('Tickover: no question right now.'); return }
-    const pick = await vscode.window.showQuickPick(quickPickItems(q), { title: q.kind === 'profile' ? 'Tickover panel profile · unpaid' : `${q.sponsor} asks · ${money(q.price_cents)}`, placeHolder: q.text })
+    const pick = await vscode.window.showQuickPick(quickPickItems(q), { title: quickPickTitle(q), placeHolder: quickPickPlaceholder(q) })
     if (!pick) return
     if (pick.index === -1) await client.skip(q.assignment_id)
     else await client.answer(q.assignment_id, pick.index)

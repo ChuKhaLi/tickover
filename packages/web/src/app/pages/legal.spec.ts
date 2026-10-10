@@ -32,7 +32,7 @@ const atCost = quoteStudy({ targeted: false, atCost: true })
 
 // The three spec §5.5 lists, quoted. `packages/contract`'s DISCLOSURE is what the
 // pages render; these literals are what stops it being narrowed in one commit.
-const SENT = 'GitHub id, operating system, Claude Code version, when each turn starts and stops, counts of file extensions in your project directory, and your answers with how long you took and where you answered them (terminal pane, local page, VS Code, or inside Claude Code)'
+const SENT = 'GitHub id, operating system, Claude Code version, when each turn starts and stops, the Claude Code session id and when that session started, counts of file extensions in your project directory, which questions you skip, and your answers with how long you took and where you answered them (terminal pane, local page, VS Code, or inside Claude Code)'
 const DERIVED = 'your country, from the IP address of the request, and an activity tier from how many turns you run a week (light under 5, regular 5 to 20, heavy over 20)'
 const NEVER = 'prompts, file contents, file paths, repository names, repository owners, or transcripts'
 
@@ -131,6 +131,17 @@ describe('the privacy page', () => {
     const text = textOf(PrivacyPage)
     expect(text).toContain('a different code in every study')
     expect(text, 'the GitHub login is not ruled out of buyer results').toContain('never your GitHub login')
+  })
+
+  // R912. The export's column is primary_language: topLanguages(languageMix, 1) in
+  // domain/results.ts, a language name worked out from extension counts -- not an extension.
+  it('names the language column a buyer receives as the language it is', () => {
+    const el = elementOf(PrivacyPage)
+    const heading = Array.from(el.querySelectorAll('h2')).find((h) => h.textContent?.trim() === 'What a buyer receives')
+    const row = normalize(heading!.nextElementSibling?.textContent)
+    expect(row).toContain('your primary programming language (the one with the most files in your file-extension counts)')
+    expect(row).not.toContain('file extension,')
+    expect(textOf(PrivacyPage)).toContain('Last updated 9 October 2026.')
   })
 
   /**
@@ -353,9 +364,35 @@ describe('the buyer terms', () => {
 
   it('prices a study from the contract, at-cost row included', () => {
     const text = textOf(BuyerTermsPage)
-    expect(text).toContain(`${formatCents(full.priceCents)} per valid response`)
+    expect(text).toContain(`${formatCents(full.priceCents)} per valid answer to each question`)
     expect(text).toContain(`${formatCents(atCost.priceCents)}`)
     expect(text).toContain(`${PRICING.MIN_RESPONDENTS} to ${PRICING.MAX_RESPONDENTS}`)
+  })
+
+  // R907. This paragraph said "One single-choice question ... $1 per valid response" while the
+  // server holds price x questions x respondents (study-view.ts holdFor) for a study of up to
+  // five questions -- so a five-question study cost five times what the terms named. The terms
+  // are what a buyer agrees to, so they say what the code charges.
+  it('says a study is charged per answer to each of its questions', () => {
+    const buying = paragraphAfter('#buying')
+    expect(buying).toContain('Single-choice questions, one to five in a study')
+    expect(buying).toContain('Every respondent answers every question, so a study costs that price × its questions × its respondents.')
+    expect(buying).not.toContain('One single-choice question')
+    expect(buying).not.toContain('per valid response')
+  })
+
+  // R910. The founding block on /buyers asks for payment later; this page said every uncovered
+  // study is paid before review. Both are true of the founding spec's manual arrangement, so the
+  // terms describe it instead of contradicting it.
+  it('describes the founding arrangement in the terms, in the order it happens', () => {
+    const founding = paragraphAfter('#founding')
+    expect(founding).toContain('a founding study is written with us first and paid when we tell you the panel can fill it')
+    expect(founding).toContain('Review starts once it is paid, as for every study.')
+    expect(founding).toContain('If a founding study does not fill within 14 days of going live, we close it and refund the unused part to the account it was paid from.')
+  })
+
+  it('is dated the day its content last changed', () => {
+    expect(textOf(BuyerTermsPage)).toContain('Last updated 9 October 2026.')
   })
 
   // R500: a study is paid by invoice, not through a merchant of record, and there is no

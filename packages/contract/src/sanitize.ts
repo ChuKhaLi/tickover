@@ -4,7 +4,13 @@ const OSC = /\u001b\][^\u0007\u001b]*(?:\u0007|\u001b\\)/g
 const CSI = /(?:\u001b\[|\u009b)[0-?]*[ -/]*[@-~]/g
 const ESC_SINGLE = /\u001b[@-Z\\-_]/g
 const CONTROL = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f]/g
-const ZERO_WIDTH = /[\u200b-\u200f\u2028-\u202e\u2060-\u2064\ufeff]/g
+// Invisible or direction-changing characters a buyer could use to hide or reorder what a developer
+// reads: zero-width marks, line/paragraph separators, bidi embeddings/overrides (202A-202E) and
+// isolates (2066-2069), the Arabic letter mark, the Mongolian vowel separator, the two Hangul
+// fillers (drawn blank, but letters, so string-width counts them as columns) and the tag block
+// E0000-E007F (invisible, used to smuggle ASCII). The `u` flag is what lets the class name astral
+// code points; without it E0000 would be read as two surrogate halves (R917).
+const ZERO_WIDTH = /[\u061c\u180e\u200b-\u200f\u2028-\u202e\u2060-\u2064\u2066-\u2069\u3164\uffa0\ufeff\u{e0000}-\u{e007f}]/gu
 
 /**
  * Display columns a string occupies. The single authority on width in this codebase: any budgeting

@@ -117,9 +117,9 @@ describe('study form', () => {
     const d = emptyDraft()
     d.targetCount = 100
     d.questions.push({ text: 'Second?', options: ['A', 'B'], context: '' })
-    expect(quoteFor(d, true)).toEqual({ priceCents: 100, developerCents: 50, targeted: false, atCost: false, holdCents: 20000 })
+    expect(quoteFor(d, true)).toEqual({ priceCents: 100, developerCents: 50, targeted: false, atCost: false, questions: 2, respondents: 100, holdCents: 20000 })
     d.targeting.languages = ['typescript']
-    expect(quoteFor(d, false)).toEqual({ priceCents: 81, developerCents: 75, targeted: true, atCost: true, holdCents: 16200 })
+    expect(quoteFor(d, false)).toEqual({ priceCents: 81, developerCents: 75, targeted: true, atCost: true, questions: 2, respondents: 100, holdCents: 16200 })
   })
 
   // Once a study exists it, not the form, is what will be charged: the size, the
@@ -136,8 +136,8 @@ describe('study form', () => {
     }
     // The server's `holdFor` is price x questionCount x targetCount
     // (`packages/server/src/domain/study-view.ts`). At cost that is 56 x 2 x 500.
-    expect(quoteForSaved(saved, false)).toEqual({ priceCents: 56, developerCents: 50, targeted: false, atCost: true, holdCents: 56000 })
-    expect(quoteForSaved(saved, true)).toEqual({ priceCents: 100, developerCents: 50, targeted: false, atCost: false, holdCents: 100000 })
+    expect(quoteForSaved(saved, false)).toEqual({ priceCents: 56, developerCents: 50, targeted: false, atCost: true, questions: 2, respondents: 500, holdCents: 56000 })
+    expect(quoteForSaved(saved, true)).toEqual({ priceCents: 100, developerCents: 50, targeted: false, atCost: false, questions: 2, respondents: 500, holdCents: 100000 })
     // Targeting is read off the stored study too, not off the form.
     expect(quoteForSaved({ ...saved, targeting: { languages: ['typescript'] } }, false).priceCents).toBe(81)
 

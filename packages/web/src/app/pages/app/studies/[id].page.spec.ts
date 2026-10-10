@@ -512,7 +512,7 @@ describe('StudyPage', () => {
   it('shows the money the server sent, in dollars', async () => {
     const m = await open(study({ hold_cents: 1250 }))
     expect(m.text()).toContain('Held $12.50')
-    expect(m.text()).toContain('$1.00 per response')
+    expect(m.text()).toContain('$1.00 per answer')
     expect(m.text()).not.toContain('9800')
     expect(m.text()).not.toContain('1250')
   })
@@ -523,14 +523,14 @@ describe('StudyPage', () => {
   // there is no `PRICING` on the page to disagree with the server.
   it('prints the price the server quoted, at cost and targeted alike', async () => {
     const atCost = await open(study({ at_cost: true, price_cents: 55 }))
-    expect(atCost.text()).toContain('$0.55 per response')
+    expect(atCost.text()).toContain('$0.55 per answer')
     expect(atCost.text()).toContain('at cost')
 
     const targeted = await open(study({ at_cost: true, price_cents: 80, targeting: { languages: ['typescript'] } }))
-    expect(targeted.text()).toContain('$0.80 per response')
+    expect(targeted.text()).toContain('$0.80 per answer')
 
     const paid = await open(study({ at_cost: false, price_cents: 100 }))
-    expect(paid.text()).toContain('$1.00 per response')
+    expect(paid.text()).toContain('$1.00 per answer')
     expect(paid.text()).not.toContain('at cost')
   })
 

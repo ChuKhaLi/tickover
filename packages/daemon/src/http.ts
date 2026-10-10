@@ -139,6 +139,12 @@ function firstHeader(v: string | string[] | undefined): string | undefined {
   return Array.isArray(v) ? v[0] : v
 }
 
+/** `application/json`, any case, with or without parameters -- and nothing that merely starts
+ * with it, so `application/jsonx` is not JSON. */
+function isJson(contentType: string | undefined): boolean {
+  return (contentType ?? '').split(';')[0]!.trim().toLowerCase() === 'application/json'
+}
+
 /** Constant-time token comparison — free on a gate this important, even though loopback-only
  * traffic makes timing attacks impractical in practice. */
 function tokenEquals(candidate: string | null | undefined, expected: string): boolean {
@@ -162,6 +168,29 @@ export function createLocalServer(ctx: LocalContext): http.Server {
       const host = req.headers.host ?? ''
       const allowed = new Set([`127.0.0.1:${ctx.port()}`, `localhost:${ctx.port()}`])
       if (!allowed.has(host)) return json(res, 421, { error: 'misdirected' })
+
+      // Same-site CSRF (audit C4, R918). A page on any other 127.0.0.1 port is the same *site*,
+      // so the SameSite=Strict login cookie rides along on its requests. Browsers attach Origin to
+      // every cross-origin request that could do harm here, so any Origin that is not this
+      // daemon's own (one per allowed Host) is refused. Node, the plugin scripts and VS Code's
+      // extension host send no Origin at all, and the page sends its own.
+      //
+      // A request carrying the token in its header is exempt (R916): a browser cannot add a custom
+      // header to a cross-origin request without a preflight this server never grants, so the
+      // header proves a non-browser caller, and Claude Code's $.http.fetch (band.tsx) keeps working
+      // whether or not it sends an Origin. The cookie alone is what a same-site page can ride on.
+      const origin = firstHeader(req.headers.origin)
+      const headerToken = tokenEquals(firstHeader(req.headers['x-tickover-token']), ctx.token)
+      if (!headerToken && origin !== undefined && !new Set([...allowed].map((h) => `http://${h}`)).has(origin)) {
+        return json(res, 403, { error: 'forbidden_origin' })
+      }
+      // The second half: with no Origin (stripped by privacy settings, or an older browser), a form
+      // or no-cors fetch can still POST, but only as text/plain, urlencoded or multipart -- a JSON
+      // content type forces a preflight this server never grants. Every POST route, including the
+      // bodyless /v1/login/start, because a form can start a device login just as well.
+      if (req.method !== 'GET' && req.method !== 'HEAD' && !isJson(req.headers['content-type'])) {
+        return json(res, 415, { error: 'unsupported_media_type' })
+      }
 
       if (req.method === 'GET' && url.pathname === '/') {
         const t = url.searchParams.get('t')

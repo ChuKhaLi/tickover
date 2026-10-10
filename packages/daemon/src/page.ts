@@ -66,7 +66,7 @@ export function sanitizeField(input: string, maxChars: number): string {
     .replace(/(?:\u001b\[|\u009b)[0-?]*[ -/]*[@-~]/g, '') // CSI
     .replace(/\u001b[@-Z\\-_]/g, '') // single-character escapes
     .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f]/g, '') // C0 and C1 controls
-    .replace(/[\u200b-\u200f\u2028-\u202e\u2060-\u2064\ufeff]/g, '') // zero-width, separators, bidi overrides
+    .replace(/[\u061c\u180e\u200b-\u200f\u2028-\u202e\u2060-\u2064\u2066-\u2069\u3164\uffa0\ufeff\u{e0000}-\u{e007f}]/gu, '') // zero-width, separators, bidi overrides and isolates, fillers, tags (R917)
     .replace(/[\r\n\t]+/g, ' ')
     .replace(/ {2,}/g, ' ')
     .trim()

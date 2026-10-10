@@ -29,7 +29,7 @@ export async function raw(
 const H1: Record<string, string> = {
   '/': 'This line is the product.',
   '/developers': 'Get paid to answer one question while Claude works',
-  '/buyers': 'Ask 300 AI-native developers one question',
+  '/buyers': 'Ask AI-native developers while their agent works',
   '/data': 'What AI-native developers say',
   '/privacy': 'Privacy',
   '/terms/developers': 'Developer terms',
@@ -58,7 +58,7 @@ for (const [route, text] of Object.entries(H1)) {
 // route or a new one, goes red on the bytes rather than only in a browser tab someone happens to
 // scroll all the way down.
 const H2_BELOW_FOLD: Record<string, string[]> = {
-  '/': ['Earn while Claude thinks', 'Ask 300 AI-native developers one question'],
+  '/': ['Earn while Claude thinks', 'Ask AI-native developers while their agent works'],
 }
 
 for (const [route, headings] of Object.entries(H2_BELOW_FOLD)) {

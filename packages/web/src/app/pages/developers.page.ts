@@ -39,7 +39,7 @@ import { DERIVED_LIST, NEVER_LIST, SENT_LIST } from '../lib/disclosure'
            not the rule being kept, and a net only catches the change someone wrote a
            comparison for (R58). -->
       <p class="mt-2 max-w-[68ch]"><tk-money [cents]="buyerPriceCents" /> per response to the buyer, you keep {{ developerShare }}%, up to {{ maxPaidPerDay }} paid answers a day. Paid per answer, never per second, so a longer Claude run earns nothing extra. Payout monthly from <tk-money [cents]="payoutMinCents" /> via PayPal.</p>
-      <h2 class="mt-10 text-h2 text-ink-900 dark:text-ink-50">What leaves your machine</h2>
+      <h2 id="what-leaves" class="mt-10 text-h2 text-ink-900 dark:text-ink-50">What leaves your machine</h2>
       <!-- Spec §5.5's three lists, rendered from the contract's DISCLOSURE rather
            than typed here. Four surfaces carry them -- this page, /privacy,
            /dev/settings and the plugin consent screen -- and the answer source

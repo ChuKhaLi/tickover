@@ -64,7 +64,7 @@ type LoadFailure = 'error' | 'gone'
            four configurations (R49, R58). -->
       <p tk-meta>
         <span>Sponsor {{ s.sponsor }}</span>
-        <span><tk-money [cents]="s.price_cents" /> per response</span>
+        <span><tk-money [cents]="s.price_cents" /> per answer</span>
         @if (s.at_cost) { <span>your first study, at cost</span> }
       </p>
 

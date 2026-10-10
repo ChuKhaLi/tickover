@@ -81,14 +81,15 @@ export const PAGE_META: Record<string, PageMeta> = {
   },
   '/buyers': {
     path: '/buyers',
-    title: `${SITE_NAME} for buyers — ask 300 AI-native developers one question`,
-    description: `Ask 300 AI-native developers one question. ${formatCents(base.priceCents)} per valid response, and every respondent answered inside Claude Code. First study at cost.`,
+    // R908: no panel size in the preview. R907: priced per answer to each question, as charged.
+    title: `${SITE_NAME} for buyers — ask AI-native developers while their agent works`,
+    description: `Single-choice questions, answered by AI-native developers while their coding agent works. ${formatCents(base.priceCents)} per valid answer to each question. First study at cost.`,
   },
   '/data': {
     path: '/data',
     title: `${SITE_NAME} — what AI-native developers say`,
     description:
-      'Weekly aggregates from unpaid profile questions answered inside Claude Code. No individual answers are published.',
+      'Weekly aggregates from unpaid profile questions, answered by developers while Claude Code works. No individual answers are published.',
   },
   // Spec §7's legal minimum. These three are prerendered for the same reason the
   // four above are: with `ssr: false` the head is all a crawler can read of a page,
@@ -109,7 +110,7 @@ export const PAGE_META: Record<string, PageMeta> = {
   '/terms/buyers': {
     path: '/terms/buyers',
     title: `${SITE_NAME} — buyer terms`,
-    description: `What a study may ask, what it may not, and what may be done with the results. ${formatCents(base.priceCents)} per valid response, every study read by a person first.`,
+    description: `What a study may ask, what it may not, and what may be done with the results. ${formatCents(base.priceCents)} per valid answer to each question, every study read by a person first.`,
   },
 }
 

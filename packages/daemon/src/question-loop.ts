@@ -157,6 +157,21 @@ export class QuestionLoop {
     if (this.recent.length > RECENT_HISTORY_LIMIT) this.recent.length = RECENT_HISTORY_LIMIT
   }
 
+  /**
+   * One entry per assignment, as the server keeps it (serve.ts reads each assignment's state): the
+   * current question's 'served' becomes its outcome rather than gaining a second entry. Pushing
+   * both left two skips as [skipped, served, skipped, served], so the skip-pause streak in
+   * evaluateEligibility never saw two skips in a row and never fired here (audit, R921).
+   *
+   * Called only while a question is current, and the head is then always that question's 'served':
+   * tick() pushes it on serve and nothing else pushes while `current` is set, and `current` is not
+   * persisted, so no restart can leave a current question without it. A history written by an older
+   * daemon interleaves 'served' entries; they read as non-skips, so it can only delay a pause.
+   */
+  private settleRecent(state: AssignmentState): void {
+    this.recent[0] = state
+  }
+
   private saveHistory(): void {
     this.d.state.set('history', JSON.stringify({
       lastServedAt: this.lastServedAt ? this.lastServedAt.toISOString() : null,
@@ -223,7 +238,7 @@ export class QuestionLoop {
     if (this.current && now.getTime() > new Date(this.current.question.expires_at).getTime()) {
       this.d.log.info('question expired locally', { assignment: this.current.question.assignment_id })
       this.current = null
-      this.pushRecent('expired')
+      this.settleRecent('expired')
       this.saveHistory()
       this.broadcast()
     }
@@ -312,7 +327,7 @@ export class QuestionLoop {
       this.profileToday += 1
     }
     this.current = null
-    this.pushRecent('answered')
+    this.settleRecent('answered')
     this.saveHistory()
 
     // Same reasoning as tick()'s M4 guard: flushing while logged out can't succeed (ServerClient
@@ -357,7 +372,7 @@ export class QuestionLoop {
     if (!cur || cur.question.assignment_id !== assignmentId) return false
     this.current = null
     this.lastSkipAt = this.d.clock()
-    this.pushRecent('skipped')
+    this.settleRecent('skipped')
     this.saveHistory()
     this.broadcast()
     // Best-effort: the developer's local view already cleared regardless of whether the server

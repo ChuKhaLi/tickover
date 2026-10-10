@@ -110,6 +110,75 @@ describe('question loop over the local api', () => {
     expect(await late.json()).toMatchObject({ accepted: false, reason: 'not_current' })
   })
 
+  // Audit 2026-10-08 (Lower): the skip pause never fired on the client. tick() pushed 'served' and
+  // skip() pushed 'skipped' as two entries, so two skips in a row left [skipped, served, skipped,
+  // served] and evaluateEligibility's "last two are both skipped" never held -- only the server's
+  // own check stood between a skipping developer and a question every five minutes (R921).
+  describe('the skip pause (RULES.SKIP_STREAK skips in a row)', () => {
+    const A = '11111111-1111-4111-8111-111111111111'
+    const B = '22222222-2222-4222-8222-222222222222'
+    const C = '33333333-3333-4333-8333-333333333333'
+    const skipReq = (id: string) => fetch(`${t.base}/v1/skip`, { method: 'POST', headers: t.headers, body: JSON.stringify({ assignment_id: id }) })
+    async function serve(id: string): Promise<void> {
+      t.fake.nextQueue.push({ question: servedQuestion({ assignment_id: id, expires_at: new Date(t.clock.now.getTime() + 10 * 60_000).toISOString() }) })
+      const before = t.fake.nextCalls.length
+      await t.daemon.loop.tick()
+      expect(t.fake.nextCalls.length, `served ${id}`).toBe(before + 1)
+      expect((await q(t)).question.assignment_id).toBe(id)
+    }
+
+    it('stops asking the server after two consecutive skips, until the pause ends', async () => {
+      await startTurn(t)
+      await serve(A)
+      expect((await skipReq(A)).status).toBe(204)
+      t.clock.advanceMinutes(6)
+      await serve(B)
+      expect((await skipReq(B)).status).toBe(204)
+      const skippedAt = t.clock.now.getTime()
+
+      // Past the 5-minute gap, so the gap rule cannot be what holds it back.
+      t.clock.advanceMinutes(6)
+      t.fake.nextQueue.push({ question: servedQuestion({ assignment_id: C, expires_at: new Date(t.clock.now.getTime() + 10 * 60_000).toISOString() }) })
+      await t.daemon.loop.tick()
+      expect(t.fake.nextCalls).toHaveLength(2)
+
+      // One second short of the pause: still nothing. Then just past it: served.
+      t.clock.now = new Date(skippedAt + 60 * 60_000 - 1_000)
+      await t.daemon.loop.tick()
+      expect(t.fake.nextCalls).toHaveLength(2)
+      t.clock.now = new Date(skippedAt + 60 * 60_000 + 1_000)
+      await t.daemon.loop.tick()
+      expect(t.fake.nextCalls).toHaveLength(3)
+    })
+
+    it('does not pause after a skip, an answer and a skip -- the streak is consecutive', async () => {
+      await startTurn(t)
+      await serve(A)
+      await skipReq(A)
+      t.clock.advanceMinutes(6)
+      await serve(B)
+      await answerReq(t, { assignment_id: B, option_index: 0, source: 'pane' })
+      t.clock.advanceMinutes(6)
+      await serve(C)
+      await skipReq(C)
+      t.clock.advanceMinutes(6)
+      await serve('44444444-4444-4444-8444-444444444444')
+    })
+
+    it('does not pause after a skip and an expiry', async () => {
+      await startTurn(t)
+      await serve(A)
+      await skipReq(A)
+      t.clock.advanceMinutes(6)
+      await serve(B)
+      t.clock.advanceMinutes(11)
+      await t.daemon.loop.tick() // B expires locally
+      expect((await q(t)).question).toBeNull()
+      t.clock.advanceMinutes(1)
+      await serve(C)
+    })
+  })
+
   it('shows one question across sessions and clears it everywhere after one answer', async () => {
     await startTurn(t, 'a')
     await hook(t, 'SessionStart', 'b')

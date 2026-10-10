@@ -81,11 +81,17 @@ describe('PAGE_META', () => {
     expect(PAGE_META['/developers'].description).toBe(
       `Install one open-source plugin. Answer with one key. ${formatCents(base.developerCents)} to you per response, up to ${RULES.MAX_PAID_PER_DAY} paid answers a day.`,
     )
+    // R907/R908/R911: no panel size, the unit the server charges, and no claim that every
+    // answer was given inside Claude Code (the pane, the local page and VS Code answer too).
+    expect(PAGE_META['/buyers'].title).toBe('Tickover for buyers — ask AI-native developers while their agent works')
     expect(PAGE_META['/buyers'].description).toBe(
-      `Ask 300 AI-native developers one question. ${formatCents(base.priceCents)} per valid response, and every respondent answered inside Claude Code. First study at cost.`,
+      `Single-choice questions, answered by AI-native developers while their coding agent works. ${formatCents(base.priceCents)} per valid answer to each question. First study at cost.`,
+    )
+    expect(PAGE_META['/terms/buyers'].description).toBe(
+      `What a study may ask, what it may not, and what may be done with the results. ${formatCents(base.priceCents)} per valid answer to each question, every study read by a person first.`,
     )
     expect(PAGE_META['/data'].description).toBe(
-      'Weekly aggregates from unpaid profile questions answered inside Claude Code. No individual answers are published.',
+      'Weekly aggregates from unpaid profile questions, answered by developers while Claude Code works. No individual answers are published.',
     )
   })
 

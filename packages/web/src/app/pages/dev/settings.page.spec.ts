@@ -43,7 +43,7 @@ const DATA: DataSummary = {
  * that file, and the test near the bottom reads both pages and demands both carry
  * them — the only thing that stops the two drifting apart.
  */
-const SENT = 'GitHub id, operating system, Claude Code version, when each turn starts and stops, counts of file extensions in your project directory, and your answers with how long you took and where you answered them (terminal pane, local page, VS Code, or inside Claude Code)'
+const SENT = 'GitHub id, operating system, Claude Code version, when each turn starts and stops, the Claude Code session id and when that session started, counts of file extensions in your project directory, which questions you skip, and your answers with how long you took and where you answered them (terminal pane, local page, VS Code, or inside Claude Code)'
 const DERIVED = 'your country, from the IP address of the request, and an activity tier from how many turns you run a week (light under 5, regular 5 to 20, heavy over 20)'
 const NEVER = 'prompts, file contents, file paths, repository names, repository owners, or transcripts'
 

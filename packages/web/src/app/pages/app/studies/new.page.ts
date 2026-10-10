@@ -99,7 +99,7 @@ export const ESTIMATE_DEBOUNCE_MS = 400
                figure below is the difference between this buyer's two quotes
                (R49 -- a price in copy comes from the contract, and from the right
                branch of it). -->
-          <h2 class="text-h2 text-ink-900 dark:text-ink-50">Targeting (+<tk-money [cents]="surcharge()" /> per response)</h2>
+          <h2 class="text-h2 text-ink-900 dark:text-ink-50">Targeting (+<tk-money [cents]="surcharge()" /> per answer)</h2>
           <p class="max-w-[68ch] text-small text-ink-600 dark:text-ink-400">Within a group a developer matches any choice; across groups they must match every group. Choosing an operating system leaves out developers whose system we don't know yet.</p>
           <div role="group" aria-labelledby="tg-languages" class="space-y-2">
             <h3 class="text-body font-semibold text-ink-900 dark:text-ink-50" id="tg-languages">Languages</h3>
@@ -177,9 +177,13 @@ export const ESTIMATE_DEBOUNCE_MS = 400
         <h2 class="text-h3 text-ink-900 dark:text-ink-50">Quote</h2>
         @if (quote(); as q) {
           <dl class="mt-3 space-y-1">
-            <div class="flex justify-between gap-4"><dt>Per valid response</dt><dd><tk-money voice="data" [cents]="q.priceCents" /></dd></div>
+            <!-- R907: the unit is an answer to one question, and the total is that price
+                 times both counts -- written out, because "per response" beside a total
+                 for two questions read as a total twice too high. -->
+            <div class="flex justify-between gap-4"><dt>Per valid answer, each question</dt><dd><tk-money voice="data" [cents]="q.priceCents" /></dd></div>
             <div class="flex justify-between gap-4"><dt>Developer keeps</dt><dd><tk-money voice="data" [cents]="q.developerCents" /></dd></div>
-            <div class="mt-2 flex justify-between gap-4 font-medium"><dt>Hold at submit</dt><dd><tk-money voice="data" [cents]="q.holdCents" /></dd></div>
+            <div class="flex justify-between gap-4"><dt>Questions × respondents</dt><dd>{{ q.questions }} × {{ q.respondents }}</dd></div>
+            <div class="mt-2 flex justify-between gap-4 font-medium"><dt>Study total, held at submit</dt><dd><tk-money voice="data" [cents]="q.holdCents" /></dd></div>
             <div class="flex justify-between gap-4 text-ink-600 dark:text-ink-400"><dt>Credits available</dt><dd><tk-money voice="data" [cents]="auth.buyer()?.credit_cents ?? 0" /></dd></div>
           </dl>
           <!-- A line, not a panel. It was the last filled green in the application,
@@ -190,7 +194,7 @@ export const ESTIMATE_DEBOUNCE_MS = 400
         <!-- The server re-quotes under the buyer's row lock at submit, and that
              number is what is charged. Saying so here keeps the panel a quote
              rather than a promise. -->
-        <p class="mt-3 max-w-[68ch] text-small text-ink-600 dark:text-ink-400">Confirmed when the study is submitted; the hold is released for any response that never arrives.</p>
+        <p class="mt-3 max-w-[68ch] text-small text-ink-600 dark:text-ink-400">Confirmed when the study is submitted; the hold is released for any answer that never arrives.</p>
         @if (issueList().length) { <ul class="mt-3 list-disc pl-5 text-rejected-fg dark:text-rejected-edge">@for (i of issueList(); track i) { <li>{{ i }}</li> }</ul> }
         <!-- Two failures, two sentences. One string covering both told a buyer
              whose study had been saved that it had not been, and the retry it

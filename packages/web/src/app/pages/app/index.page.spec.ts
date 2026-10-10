@@ -74,6 +74,10 @@ describe('buyer StudiesPage', () => {
     expect(text).toContain('$1.00')
     expect(text).toContain('12 / 100')
     expect(text).toContain('Draft one')
+    // R907: the price column is per answer to each question, which is what price_cents is.
+    const heads = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('th'), (th) => th.textContent?.trim())
+    expect(heads).toContain('Per answer')
+    expect(heads).not.toContain('Per response')
   })
 
   it('shows the empty state with a link to create a study', async () => {

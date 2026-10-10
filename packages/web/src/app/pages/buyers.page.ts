@@ -11,8 +11,12 @@ import { WaitlistForm } from '../ui/waitlist-form'
   imports: [Shell, WaitlistForm, RouterLink, Link, Money, Figure, Rows],
   template: `
     <tk-shell [links]="[{ href: '/developers', label: 'For developers' }, { href: '/data', label: 'Data' }, { href: '/app/login', label: 'Sign in' }]">
-      <h1 class="max-w-[24ch] text-h1-public text-ink-900 dark:text-ink-50">Ask 300 AI-native developers one question</h1>
-      <p class="mt-3 max-w-[68ch] text-lead text-ink-600 dark:text-ink-400">Every respondent answered inside Claude Code. No panel can fake that. Message tests, feature validation, pricing pulses, delivered in days.</p>
+      <!-- R908: no panel size. "300" was the panel spec 7 aimed for, read by buyers as the panel
+           there is. R911: answers come from the pane, the local page, VS Code and the band, so
+           the claim is about when a question is shown, which is true of all of them. And no
+           delivery time: the buyer terms promise none. -->
+      <h1 class="max-w-[24ch] text-h1-public text-ink-900 dark:text-ink-50">Ask AI-native developers while their agent works</h1>
+      <p class="mt-3 max-w-[68ch] text-lead text-ink-600 dark:text-ink-400">Every question is shown while the developer's Claude Code is working, and answered with one key from their terminal, editor or a local page. Message tests, feature validation, pricing pulses. The panel is new, so no fill time is promised.</p>
 
       <!-- Every figure here is quoteStudy evaluated for the configuration named
            beside it. They were typed in until this commit: the prices happened to be
@@ -23,9 +27,14 @@ import { WaitlistForm } from '../ui/waitlist-form'
            No backticks in these comments: the template is a template literal. -->
       <table tk-rows class="mt-8 max-w-xl">
         <tbody>
-          <tr><td>Per valid response</td><td tk-figure><tk-money voice="data" [cents]="full.priceCents" /></td></tr>
+          <!-- R907: the server holds price x questions x respondents (study-view.ts holdFor),
+               so the unit is an answer to one question. The worked figure is the same
+               multiplication on the contract price, never typed in (R58). -->
+          <tr><td>Per valid answer to each question</td><td tk-figure><tk-money voice="data" [cents]="full.priceCents" /></td></tr>
           <tr><td>With targeting (language, country, activity, OS)</td><td tk-figure>+<tk-money voice="data" [cents]="targetingCents" /></td></tr>
           <tr><td>Study size</td><td tk-figure>{{ minRespondents }} to {{ maxRespondents }} respondents</td></tr>
+          <tr><td>Questions per study</td><td tk-figure>1 to {{ maxQuestions }}</td></tr>
+          <tr><td colspan="2">Every respondent answers every question, so a study costs the per-answer price × questions × respondents: 2 questions to 100 respondents is <tk-money [cents]="exampleCents" />.</td></tr>
           <!-- R500: an uncovered study waits before review until it is paid; there is no credit bought ahead. -->
           <tr><td>Pay per study</td><td tk-figure>By PayPal</td></tr>
           <!-- Both branches, because the row above sells targeting and nothing stops
@@ -39,7 +48,7 @@ import { WaitlistForm } from '../ui/waitlist-form'
                footnote: it is the Phase 0 offer this page exists to make, and the
                launch offer set in the quietest ink on the page was a downgrade the
                eye caught straight away. -->
-          <tr><td colspan="2">Your first study, at cost: <tk-money [cents]="atCost.priceCents" /> per response, or <tk-money [cents]="atCostTargeted.priceCents" /> with targeting — the developer's <tk-money [cents]="atCost.developerCents" /> or <tk-money [cents]="atCostTargeted.developerCents" /> plus <tk-money [cents]="atCostFeeCents" /> payment fees, we take $0</td></tr>
+          <tr><td colspan="2">Your first study, at cost: <tk-money [cents]="atCost.priceCents" /> per answer, or <tk-money [cents]="atCostTargeted.priceCents" /> with targeting — the developer's <tk-money [cents]="atCost.developerCents" /> or <tk-money [cents]="atCostTargeted.developerCents" /> plus <tk-money [cents]="atCostFeeCents" /> payment fees, we take $0</td></tr>
         </tbody>
       </table>
 
@@ -50,7 +59,11 @@ import { WaitlistForm } from '../ui/waitlist-form'
            the review policy below already uses, so the stylesheet does not move. -->
       <section id="founding">
         <h2 class="mt-10 text-h2 text-ink-900 dark:text-ink-50">Founding buyers</h2>
-        <p class="mt-2 max-w-[68ch]">The developer panel is new and still growing. The first five buyers write their study now and pay only once the panel can fill it; if a founding study does not fill within 14 days of going live, the unused part is refunded. <a tk-link [href]="foundingMail">Email {{ contact }}</a> to take a place.</p>
+        <!-- R910: the order is the point. "Pay only once the panel can fill it" read as
+             pay-after-results beside terms that say a study is paid before review starts.
+             The founding spec's arrangement is manual and satisfies both: asked to pay later,
+             reviewed once paid, closed and refunded by hand at day 14. -->
+        <p class="mt-2 max-w-[68ch]">The developer panel is new and still growing. The first five buyers write their study with us now, and we ask for payment only when we judge the panel can fill it. Review starts once it is paid, as for every study. If a founding study does not fill within 14 days of going live, we close it and refund the unused part to the account it was paid from. <a tk-link [href]="foundingMail">Email {{ contact }}</a> to take a place; the arrangement is also in the <a tk-link routerLink="/terms/buyers" fragment="founding">buyer terms</a>.</p>
       </section>
 
       <h2 class="mt-10 text-h2 text-ink-900 dark:text-ink-50">Review policy</h2>
@@ -80,6 +93,10 @@ export default class BuyersPage {
   atCostFeeCents = PRICING.AT_COST_FEE_CENTS
   minRespondents = PRICING.MIN_RESPONDENTS
   maxRespondents = PRICING.MAX_RESPONDENTS
+  // Not imported from lib/study-form, which reads the study schemas at module load, so that
+  // the public page does not take on the buyer form's module. landing.spec.ts holds the two equal.
+  maxQuestions = 5
+  exampleCents = this.full.priceCents * 2 * 100
   contact = SITE.CONTACT_EMAIL
   foundingMail = `mailto:${SITE.CONTACT_EMAIL}?subject=Founding%20buyer`
 }

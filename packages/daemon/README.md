@@ -17,7 +17,7 @@ Install the Claude Code plugin to get the status line and hooks:
 
 ## What leaves your machine
 
-GitHub id (from login), your operating system, the Claude Code version, when each turn starts and stops, counts of file extensions in your project directory, and your answers with how long you took and where you answered them (terminal pane, local page, VS Code, or inside Claude Code).
+GitHub id (from login), your operating system, the Claude Code version, when each turn starts and stops, the Claude Code session id and when that session started, counts of file extensions in your project directory, which questions you skip, and your answers with how long you took and where you answered them (terminal pane, local page, VS Code, or inside Claude Code).
 
 Derived from those, and never sent by the plugin: your country, from the IP address of the request, and an activity tier from how many turns you run a week (light under 5, regular 5 to 20, heavy over 20). Buyers can target studies on both, which is why they are listed here rather than only in the privacy policy.
 

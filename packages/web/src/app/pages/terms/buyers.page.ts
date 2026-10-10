@@ -21,11 +21,13 @@ const atCost = quoteStudy({ targeted: false, atCost: true })
   template: `
     <tk-shell [links]="[{ href: '/buyers', label: 'For buyers' }, { href: '/privacy', label: 'Privacy' }]">
       <h1 class="text-h1-public text-ink-900 dark:text-ink-50">Buyer terms</h1>
-      <p class="mt-3 max-w-[68ch] text-ink-600 dark:text-ink-400">What you may ask, what you get back, and what you may not do with it. Last updated 27 September 2026.</p>
+      <p class="mt-3 max-w-[68ch] text-ink-600 dark:text-ink-400">What you may ask, what you get back, and what you may not do with it. Last updated 9 October 2026.</p>
 
-      <h2 class="mt-10 text-h2 text-ink-900 dark:text-ink-50">What you are buying</h2>
-      <p class="mt-2 max-w-[68ch]">One single-choice question, shown to developers in the idle window of their AI coding tool, answered with one key. You buy responses, not attention time and not impressions: <tk-money [cents]="priceCents" /> per valid response, or <tk-money [cents]="targetedCents" /> with targeting. A study is {{ minRespondents }} to {{ maxRespondents }} respondents. Your first study runs at cost — <tk-money [cents]="atCostCents" /> per response, which is the developer's share plus payment fees, and we take nothing.</p>
-      <p class="mt-2 max-w-[68ch]">You are charged for valid responses. An answer that fails an attention check is not one, is not billed, and is not in your results.</p>
+      <!-- R907: this said "One single-choice question ... per valid response" while the server
+           holds price x questions x respondents for a study of up to five questions. -->
+      <h2 id="buying" class="mt-10 text-h2 text-ink-900 dark:text-ink-50">What you are buying</h2>
+      <p class="mt-2 max-w-[68ch]">Single-choice questions, one to five in a study, shown to developers in the idle window of their AI coding tool and answered with one key. You buy answers, not attention time and not impressions: <tk-money [cents]="priceCents" /> per valid answer to each question, or <tk-money [cents]="targetedCents" /> with targeting. Every respondent answers every question, so a study costs that price × its questions × its respondents. A study is {{ minRespondents }} to {{ maxRespondents }} respondents. Your first study runs at cost — <tk-money [cents]="atCostCents" /> per answer, which is the developer's share plus payment fees, and we take nothing.</p>
+      <p class="mt-2 max-w-[68ch]">You are charged for valid answers. An answer that fails an attention check is not one, is not billed, and is not in your results.</p>
 
       <h2 class="mt-10 text-h2 text-ink-900 dark:text-ink-50">What you may not ask</h2>
       <p class="mt-2 max-w-[68ch]">Every study is read by a person before it goes live. These are the grounds for refusing one, and they are the same list our reviewer works from:</p>
@@ -46,6 +48,12 @@ const atCost = quoteStudy({ targeted: false, atCost: true })
       <h2 id="payment" class="mt-10 text-h2 text-ink-900 dark:text-ink-50">Payment</h2>
       <p class="mt-2 max-w-[68ch]">A study your credit balance does not cover is paid by PayPal before review starts; the amount due is shown on the study page. Credit is an internal balance made of refunds for invalid or unfilled responses and any overpayment. It pays for later studies and cannot be transferred to another account.</p>
       <p class="mt-2 max-w-[68ch]">A study you submit places a hold on your credits, and the hold is released when the study settles. If a study cannot be filled, the unspent part comes back to your balance.</p>
+
+      <!-- R910: /buyers offers founding buyers a later payment and a 14-day refund. Spec
+           2026-09-28-founding-buyers arranges both by hand, outside the product, so they are
+           stated here as what they are rather than left to contradict the paragraph above. -->
+      <h3 id="founding" class="mt-6 text-h3 text-ink-900 dark:text-ink-50">Founding buyers</h3>
+      <p class="mt-2 max-w-[68ch]">For the first five buyers, by arrangement with us by email, a founding study is written with us first and paid when we tell you the panel can fill it, by PayPal or by invoice. Review starts once it is paid, as for every study. If a founding study does not fill within 14 days of going live, we close it and refund the unused part to the account it was paid from. Nothing in the product closes it at day 14; a person does.</p>
 
       <!-- R500: the refund policy stays reachable from the navigation; the footer links this
            heading by its id. -->

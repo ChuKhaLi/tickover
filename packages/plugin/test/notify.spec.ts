@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeAll } from 'vitest'
 import { spawn } from 'node:child_process'
 import http from 'node:http'
 import net from 'node:net'
@@ -29,6 +29,21 @@ function run(home: string, input: unknown, hook = script): Promise<{ status: num
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
+// Upper bounds relative to what starting this script costs right now (R922), as statusline.spec.ts
+// does: these were absolute (1500, 1400), and on a loaded machine a 1785ms exit against a 1400ms
+// bound was Node starting slowly, not the hard stop failing. The baseline is the cheapest trip
+// through the script -- a Stop with no daemon.json, which posts nothing -- slowest of three at the
+// start, or a fresh run if that is slower now. The lower bounds stay absolute.
+let baseAtStart = 0
+let baseHome = ''
+async function base(): Promise<number> {
+  return Math.max(baseAtStart, (await run(baseHome, { hook_event_name: 'Stop', session_id: 'base' })).ms)
+}
+beforeAll(async () => {
+  baseHome = mkdtempSync(join(tmpdir(), 'mw-plugin-base-'))
+  for (let i = 0; i < 3; i++) baseAtStart = Math.max(baseAtStart, (await run(baseHome, { hook_event_name: 'Stop', session_id: 'base' })).ms)
+}, 60_000)
+
 async function fakeDaemon() {
   const posts: Array<{ token: string | undefined; body: unknown }> = []
   const server = http.createServer((req, res) => {
@@ -46,7 +61,7 @@ describe('notify.mjs', () => {
     const r = await run(home, { hook_event_name: 'UserPromptSubmit', session_id: 'abc', cwd: 'C:/proj', transcript_path: '/x', prompt: 'secret text' })
     expect(r.status).toBe(0)
     expect(r.stdout).toBe('')
-    expect(r.ms).toBeLessThan(1500)
+    expect(r.ms).toBeLessThan(await base() + 1000)
     expect(d.posts[0]).toEqual({ token: 'tok', body: { event: 'UserPromptSubmit', session_id: 'abc', cwd: 'C:/proj', tool: 'claude-code' } })
     await d.close()
   })
@@ -56,7 +71,7 @@ describe('notify.mjs', () => {
     const r = await run(home, { hook_event_name: 'Stop', session_id: 'abc' })
     expect(r.status).toBe(0)
     expect(r.stdout).toBe('')
-    expect(r.ms).toBeLessThan(1500)
+    expect(r.ms).toBeLessThan(await base() + 1000)
 
     const marker = join(home, 'spawned.txt')
     const fakeBin = join(home, 'fake-daemon.mjs')
@@ -123,7 +138,7 @@ describe('notify.mjs', () => {
     // Bounded well below vitest's own test timeout: proves some internal timeout fired rather
     // than the request hanging indefinitely.
     expect(r.ms).toBeGreaterThanOrEqual(500)
-    expect(r.ms).toBeLessThan(1400)
+    expect(r.ms).toBeLessThan(await base() + 1000)
     // The client already gave up and exited, but our own accepted-and-ignored socket is still
     // open from this server's point of view — destroy it first or server.close()'s callback
     // (which waits for every connection to end) never fires.
@@ -147,6 +162,6 @@ describe('notify.mjs', () => {
     expect(result.status).toBe(0)
     expect(stdout).toBe('')
     // Bounded near the 800ms hard stop, not vitest's much larger test timeout.
-    expect(result.ms).toBeLessThan(1400)
+    expect(result.ms).toBeLessThan(await base() + 1000)
   })
 })

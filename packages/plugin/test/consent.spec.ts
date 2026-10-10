@@ -52,7 +52,7 @@ describe('setup skill consent text', () => {
   // emptied in the contract would otherwise let every loop pass by finding nothing,
   // and this file would report that a consent screen disclosing nothing was correct.
   it('is checked against a disclosure that still has all three lists in it', () => {
-    expect(DISCLOSURE.sent.length).toBe(6)
+    expect(DISCLOSURE.sent.length).toBe(8)
     expect(DISCLOSURE.derived.length).toBe(2)
     expect(DISCLOSURE.never.length).toBe(6)
   })

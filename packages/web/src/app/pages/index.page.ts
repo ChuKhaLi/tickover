@@ -216,16 +216,20 @@ function seedCols(host: HTMLElement): number {
           </ol>
           <p class="mt-4 text-ink-800 dark:text-ink-100"><tk-money [cents]="developerPayCents" /> a question, up to {{ maxPaidPerDay }} a day. Never $0.002 an ad.</p>
           <p class="mt-6 flex flex-wrap items-center gap-4">
-            <a tk-button routerLink="/developers">Join the waitlist</a>
-            <a tk-link routerLink="/data">What leaves your machine</a>
+            <!-- The plugin is on the marketplace and the daemon on npm, so the way in is the
+                 install steps, not a waitlist. The data-boundary link went to /data, which
+                 shows aggregates; the three lists are under this heading on /developers. -->
+            <a tk-button routerLink="/developers">Install the plugin</a>
+            <a tk-link routerLink="/developers" fragment="what-leaves">What leaves your machine</a>
           </p>
         </section>
 
         <section>
-          <h2 class="text-h2 text-ink-900 dark:text-ink-50">Ask 300 AI-native developers one question</h2>
+          <!-- R908: no panel size; R907: the unit the server charges is an answer to a question. -->
+          <h2 class="text-h2 text-ink-900 dark:text-ink-50">Ask AI-native developers while their agent works</h2>
           <table tk-rows class="mt-4">
             <tbody>
-              <tr><td>Per valid response</td><td tk-figure><tk-money voice="data" [cents]="full.priceCents" /></td></tr>
+              <tr><td>Per valid answer to each question</td><td tk-figure><tk-money voice="data" [cents]="full.priceCents" /></td></tr>
               <tr><td>With targeting (language, country, activity, OS)</td><td tk-figure>+<tk-money voice="data" [cents]="targetingCents" /></td></tr>
               <tr><td>Study size</td><td tk-figure>{{ minRespondents }} to {{ maxRespondents }}</td></tr>
               <tr><td>Your first study, at cost</td><td tk-figure><tk-money voice="data" [cents]="atCost.priceCents" /></td></tr>

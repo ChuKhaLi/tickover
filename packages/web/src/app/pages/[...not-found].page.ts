@@ -22,7 +22,7 @@ import { Shell } from '../ui/shell'
       <ul class="mt-6 max-w-[68ch] space-y-2">
         <li><a tk-link routerLink="/">What Tickover is</a></li>
         <li><a tk-link routerLink="/developers">Get paid to answer one question while Claude works</a></li>
-        <li><a tk-link routerLink="/buyers">Ask 300 AI-native developers one question</a></li>
+        <li><a tk-link routerLink="/buyers">Ask AI-native developers while their agent works</a></li>
       </ul>
     </tk-shell>`,
 })

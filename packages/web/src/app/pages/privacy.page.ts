@@ -28,7 +28,7 @@ import { DERIVED_LIST, NEVER_LIST, SENT_LIST } from '../lib/disclosure'
   template: `
     <tk-shell [links]="[{ href: '/developers', label: 'For developers' }, { href: '/buyers', label: 'For buyers' }]">
       <h1 class="text-h1-public text-ink-900 dark:text-ink-50">Privacy</h1>
-      <p class="mt-3 max-w-[68ch] text-ink-600 dark:text-ink-400">The same three lists the plugin shows you before it sends anything, plus what happens to them afterwards. Last updated 27 September 2026.</p>
+      <p class="mt-3 max-w-[68ch] text-ink-600 dark:text-ink-400">The same three lists the plugin shows you before it sends anything, plus what happens to them afterwards. Last updated 9 October 2026.</p>
 
       <h2 class="mt-10 text-h2 text-ink-900 dark:text-ink-50">Who runs this</h2>
       <p class="mt-2 max-w-[68ch]">Tickover is a trading name of an independent sole proprietor based in Vietnam. There is no company behind it yet. Questions, corrections and requests all go to the same place: hello&#64;tickover.dev, answered by a person.</p>
@@ -51,7 +51,7 @@ import { DERIVED_LIST, NEVER_LIST, SENT_LIST } from '../lib/disclosure'
       <p class="mt-2 max-w-[68ch]">Nothing here is sold, and nothing is used to build a profile for anyone but you and the buyer of a study you answered.</p>
 
       <h2 class="mt-10 text-h2 text-ink-900 dark:text-ink-50">What a buyer receives</h2>
-      <p class="mt-2 max-w-[68ch]">One row per answer: the option you chose, when you chose it, your country, your most-used file extension, your activity tier, your operating system, and a respondent code. That code is a salted digest of your account and the study — so it is a different code in every study, and two buyers cannot line their exports up to rebuild one person across both.</p>
+      <p class="mt-2 max-w-[68ch]">One row per answer: the option you chose, when you chose it, your country, your primary programming language (the one with the most files in your file-extension counts), your activity tier, your operating system, and a respondent code. That code is a salted digest of your account and the study — so it is a different code in every study, and two buyers cannot line their exports up to rebuild one person across both.</p>
       <p class="mt-2 max-w-[68ch] font-medium">What a buyer never receives: never your GitHub login, never your GitHub id, never your email address, never anything you typed into Claude Code.</p>
       <p class="mt-2 max-w-[68ch]">Those four segment columns are withheld until a study settles. On a narrowly targeted study, a buyer watching answers arrive one at a time could otherwise read one person's country, language, tier and operating system off the first row.</p>
 

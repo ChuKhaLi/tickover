@@ -21,6 +21,7 @@ import LoginPage, { routeMeta as loginRouteMeta } from './app/login.page'
 import { WAITLIST_FETCH, WAITLIST_URL } from '../ui/waitlist-form'
 import { formatCents } from '../lib/money'
 import { PAGE_META, SITE_NAME } from '../lib/page-meta'
+import { MAX_QUESTIONS } from '../lib/study-form'
 
 // These pages are the Phase 0 validation artifact: the landing page whose two
 // paths and prices go to 50 buyers, r/ClaudeAI, r/cursor and X. The strings below
@@ -34,6 +35,10 @@ const targeted = quoteStudy({ targeted: true, atCost: false })
 // figure understates a targeted first study by 45%.
 const atCost = quoteStudy({ targeted: false, atCost: true })
 const atCostTargeted = quoteStudy({ targeted: true, atCost: true })
+
+// R908: the buyer line, without the panel size "300" that the panel did not have. The h1 on
+// /buyers, the buyer h2 on /, the 404 link and the /buyers title all say it.
+const BUYER_HEADLINE = 'Ask AI-native developers while their agent works'
 
 const ENDPOINT = 'https://formspree.io/f/test'
 
@@ -144,7 +149,9 @@ describe('public pages', () => {
     // developer path's heading, which is the job it was always doing.
     expect(text).toContain('This line is the product.')
     expect(text).toContain('Earn while Claude thinks')
-    expect(text).toContain('Ask 300 AI-native developers one question')
+    expect(text).toContain(BUYER_HEADLINE)
+    // R908: the panel was 0 when "300" shipped. No panel size is claimed anywhere.
+    expect(text).not.toContain('300 AI-native')
     // R81. Both figures used to be literals here as well as on the page, so the test
     // agreed with the card rather than with `quoteStudy`: halving DEVELOPER_SHARE
     // reddened 16 tests elsewhere and left this one green on a stale price, and the
@@ -155,10 +162,33 @@ describe('public pages', () => {
     // Spec §7 Phase 0 requires the price on the landing page itself. It is a table
     // now rather than a sentence, because a price list is rows; Angular drops the
     // whitespace between cells, so the label and its figure read as one string.
-    expect(text).toContain(`Per valid response${formatCents(full.priceCents)}`)
+    // R907: the server holds price x questions x respondents, so the unit is an answer to a
+    // question, not a respondent.
+    expect(text).toContain(`Per valid answer to each question${formatCents(full.priceCents)}`)
+    expect(text).not.toContain('Per valid response')
     expect(text).toContain(`With targeting (language, country, activity, OS)+${formatCents(targeted.priceCents - full.priceCents)}`)
     expect(text).toContain(`Study size${PRICING.MIN_RESPONDENTS} to ${PRICING.MAX_RESPONDENTS}`)
     expect(text).toContain(`Your first study, at cost${formatCents(atCost.priceCents)}`)
+  })
+
+  // The developer call to action: the plugin is on the marketplace and the daemon on npm, so
+  // a waitlist was no longer the way in. And the data-boundary link went to /data, which shows
+  // aggregates and says nothing about what leaves a machine; the lists are on /developers.
+  it('sends the developer path to the install steps and the data boundary to the lists', () => {
+    configure()
+    const el = render(IndexPage).nativeElement as HTMLElement
+    const links = Array.from(el.querySelectorAll('a'))
+    const install = links.find((a) => a.textContent?.trim() === 'Install the plugin')
+    expect(install?.getAttribute('href')).toBe('/developers')
+    expect(links.some((a) => a.textContent?.trim() === 'Join the waitlist'), 'the landing page still offers a developer waitlist').toBe(false)
+    const boundary = links.find((a) => a.textContent?.trim() === 'What leaves your machine')
+    expect(boundary?.getAttribute('href')).toBe('/developers#what-leaves')
+  })
+
+  it('anchors the data-boundary heading the landing page links to', () => {
+    configure()
+    const el = render(DevelopersPage).nativeElement as HTMLElement
+    expect(el.querySelector('h2#what-leaves')?.textContent?.trim()).toBe('What leaves your machine')
   })
 
   /**
@@ -212,7 +242,7 @@ describe('public pages', () => {
     expect(text).toContain(`Payout monthly from ${formatCents(RULES.PAYOUT_MIN_CENTS)} via PayPal.`)
     // Spec §5.5: "The consent screen lists exactly these lists. The developer web
     // page mirrors them." Both halves are pinned, not just the never-sent half.
-    expect(text).toContain('Your GitHub id, operating system, Claude Code version, when each turn starts and stops, counts of file extensions in your project directory, and your answers with how long you took and where you answered them (terminal pane, local page, VS Code, or inside Claude Code).')
+    expect(text).toContain('Your GitHub id, operating system, Claude Code version, when each turn starts and stops, the Claude Code session id and when that session started, counts of file extensions in your project directory, which questions you skip, and your answers with how long you took and where you answered them (terminal pane, local page, VS Code, or inside Claude Code).')
     // §5.5's third list. Without it a developer never learns their country is
     // derived at all, on the one page whose credibility rests on saying what
     // leaves the machine — while /buyers sells targeting on that same country.
@@ -247,8 +277,8 @@ describe('public pages', () => {
       // Four pages in one test, so each gets its own module: `textOf` configures one
       // and a configured module cannot be configured again.
       TestBed.resetTestingModule()
-      // Case-insensitive: a headline reads "Ask 300…" as an h1 and "ask 300…" after
-      // "Tickover for buyers".
+      // Case-insensitive: a headline reads "Ask AI-native…" as an h1 and "ask
+      // AI-native…" after "Tickover for buyers".
       expect(textOf(page).toLowerCase(), `${route} previews a headline it does not say`).toContain(
         parts[1]!.toLowerCase(),
       )
@@ -257,15 +287,22 @@ describe('public pages', () => {
 
   it('prices the buyer table from the contract, at-cost row included', () => {
     const text = textOf(BuyersPage)
-    expect(text).toContain('Every respondent answered inside Claude Code')
-    expect(text).toContain(`Per valid response${formatCents(full.priceCents)}`)
+    expect(text).toContain(`Per valid answer to each question${formatCents(full.priceCents)}`)
     expect(text).toContain(`With targeting (language, country, activity, OS)+${formatCents(targeted.priceCents - full.priceCents)}`)
     expect(text).toContain(`Study size${PRICING.MIN_RESPONDENTS} to ${PRICING.MAX_RESPONDENTS} respondents`)
+    expect(text).toContain(`Questions per study1 to 5`)
+    // The page types the ceiling rather than importing the buyer form's module; this holds the
+    // two together, and study-form.spec.ts holds MAX_QUESTIONS to the contract.
+    expect(new BuyersPage().maxQuestions).toBe(MAX_QUESTIONS)
+    // R907: what the server holds is price x questions x respondents (study-view.ts holdFor).
+    // The worked figure is computed here the same way, so a page that priced a study per
+    // respondent would show half of it.
+    expect(text).toContain(`Every respondent answers every question, so a study costs the per-answer price × questions × respondents: 2 questions to 100 respondents is ${formatCents(full.priceCents * 2 * 100)}.`)
     // The row that carries the Phase 0 offer to 50 buyers, and the one the server
     // will actually invoice from. Every figure comes from `quoteStudy`, both
     // branches, because `buyer.controller.ts` quotes `{ targeted, atCost }` and
     // re-quotes the same pair under the buyer row lock at submit.
-    expect(text).toContain(`at cost: ${formatCents(atCost.priceCents)} per response, or ${formatCents(atCostTargeted.priceCents)} with targeting — the developer's ${formatCents(atCost.developerCents)} or ${formatCents(atCostTargeted.developerCents)} plus ${formatCents(PRICING.AT_COST_FEE_CENTS)} payment fees, we take $0`)
+    expect(text).toContain(`at cost: ${formatCents(atCost.priceCents)} per answer, or ${formatCents(atCostTargeted.priceCents)} with targeting — the developer's ${formatCents(atCost.developerCents)} or ${formatCents(atCostTargeted.developerCents)} plus ${formatCents(PRICING.AT_COST_FEE_CENTS)} payment fees, we take $0`)
     expect(text).toContain('Every study is approved by a person before it goes live')
   })
 
@@ -281,8 +318,14 @@ describe('public pages', () => {
     expect(block!.textContent).toContain('The developer panel is new')
     // Each term the outreach emails promise, asserted on its own so a copy edit cannot drop one:
     // pay later, and the refund -- scoped to founding studies, which is all the offer covers.
-    expect(block!.textContent).toContain('pay only once the panel can fill it')
-    expect(block!.textContent).toContain('if a founding study does not fill within 14 days of going live, the unused part is refunded')
+    // R910: "pay only once the panel can fill it" read as pay-after-results beside terms that
+    // say a study is paid before review starts. Both are true of the manual arrangement the
+    // founding spec describes, so the block now says the order: asked to pay later, review after.
+    expect(block!.textContent).toContain('we ask for payment only when we judge the panel can fill it')
+    expect(block!.textContent).toContain('Review starts once it is paid, as for every study.')
+    expect(block!.textContent).not.toContain('pay only once the panel can fill it')
+    expect(block!.textContent).toContain('If a founding study does not fill within 14 days of going live, we close it and refund the unused part to the account it was paid from.')
+    expect(block!.querySelector('a[href="/terms/buyers#founding"]'), 'the block does not point at the terms that bind it').toBeTruthy()
     const mail = block!.querySelector('a[href^="mailto:"]')
     expect(mail?.getAttribute('href')).toBe(`mailto:${SITE.CONTACT_EMAIL}?subject=Founding%20buyer`)
     const policy = Array.from(el.querySelectorAll('h2')).find((h) => h.textContent === 'Review policy')!
@@ -555,8 +598,20 @@ describe('the spec claims these pages make', () => {
   // The differentiator the whole buyer pitch rests on. One `textOf` per test: this
   // file's helper configures the TestBed on every call, so a second call in one test
   // throws rather than rendering.
-  it('makes the claim that distinguishes this panel from a survey panel', () => {
-    expect(textOf(BuyersPage)).toContain('Every respondent answered inside Claude Code. No panel can fake that.')
+  //
+  // R908/R911: it used to read "Every respondent answered inside Claude Code. No panel can fake
+  // that. ... delivered in days." Answers also come from the terminal pane, the local page and
+  // VS Code (AnswerSource in the contract), and the buyer terms promise no fill time. The lead
+  // paragraph is the smallest element that carries the claim, so it is read on its own.
+  it('makes the claim that distinguishes this panel from a survey panel, and only claims that', () => {
+    configure()
+    const el = render(BuyersPage).nativeElement as HTMLElement
+    const lead = el.querySelector('h1 + p')!.textContent!
+    expect(lead).toContain("Every question is shown while the developer's Claude Code is working, and answered with one key from their terminal, editor or a local page.")
+    expect(lead).toContain('The panel is new, so no fill time is promised.')
+    expect(lead).not.toContain('inside Claude Code')
+    expect(lead).not.toContain('in days')
+    expect(el.querySelector('h1')!.textContent!.trim()).toBe(BUYER_HEADLINE)
   })
 
   // The developer page's own headline, which `PAGE_META` quotes into the link preview

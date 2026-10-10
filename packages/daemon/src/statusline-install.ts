@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync, renameSync, unlinkSync, statSync, rmSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync, renameSync, unlinkSync, statSync, rmSync, realpathSync, chmodSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { readConfig, writeConfig, type WrappedStatusLine } from './config.js'
@@ -58,7 +58,28 @@ function writeFileAtomic(path: string, content: string): void {
   }
 }
 
-const writeSettings = (path: string, s: Settings) => writeFileAtomic(path, `${JSON.stringify(s, null, 2)}\n`)
+/**
+ * settings.json is the developer's file, so it is rewritten *in place* (audit C6, R920): through a
+ * symlink to the file it names -- a settings.json linked from a dotfiles repo stays linked, where a
+ * rename over the path replaced the link with a plain file -- and with the original's mode, which a
+ * fresh temp file would otherwise take from the umask (a 0600 file came back 0644). Still a temp
+ * file and a rename, beside the real target so the rename never crosses a filesystem.
+ */
+function writeSettings(path: string, s: Settings): void {
+  const real = existsSync(path) ? realpathSync(path) : path
+  const mode = existsSync(real) ? statSync(real).mode & 0o7777 : undefined
+  const content = `${JSON.stringify(s, null, 2)}\n`
+  const tmp = `${real}.tmp-${process.pid}`
+  try {
+    writeFileSync(tmp, content, 'utf8')
+    // chmod rather than writeFileSync's `mode`, which the umask still narrows.
+    if (mode !== undefined) chmodSync(tmp, mode)
+    renameSync(tmp, real)
+  } catch (err) {
+    if (existsSync(tmp)) unlinkSync(tmp)
+    throw err
+  }
+}
 
 function commandOf(v: unknown): string | null {
   return v && typeof v === 'object' && typeof (v as { command?: unknown }).command === 'string' ? (v as { command: string }).command : null

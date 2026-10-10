@@ -47,7 +47,7 @@ function newestFirst(studies: StudyView[]): StudyView[] {
     >
       <p tk-empty-action class="mt-1 text-small text-ink-600 dark:text-ink-400"><a tk-link routerLink="/app/studies/new">Create your first study</a>; it runs at cost.</p>
       <table tk-rows>
-        <thead><tr><th>Title</th><th>State</th><th tk-figure>Per response</th><th tk-figure>Respondents</th><th>Created</th></tr></thead>
+        <thead><tr><th>Title</th><th>State</th><th tk-figure>Per answer</th><th tk-figure>Respondents</th><th>Created</th></tr></thead>
         <tbody>
           @for (s of studies() ?? []; track s.id) {
             <tr>

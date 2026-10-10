@@ -22,7 +22,7 @@ import { DISCLOSURE, disclosureSentence } from '../src/disclosure.js'
 describe('the spec 5.5 disclosure lists', () => {
   it('names every field that leaves the machine', () => {
     expect(DISCLOSURE.sent.map((i) => i.key)).toEqual([
-      'github_id', 'os', 'tool_version', 'turn_times', 'language_mix', 'answers',
+      'github_id', 'os', 'tool_version', 'turn_times', 'session', 'language_mix', 'skips', 'answers',
     ])
   })
 
@@ -42,7 +42,7 @@ describe('the spec 5.5 disclosure lists', () => {
   // made in three files that do not import one another.
   it('joins the sent list into the sentence the pages print', () => {
     expect(disclosureSentence(DISCLOSURE.sent, 'and')).toBe(
-      'GitHub id, operating system, Claude Code version, when each turn starts and stops, counts of file extensions in your project directory, and your answers with how long you took and where you answered them (terminal pane, local page, VS Code, or inside Claude Code)',
+      'GitHub id, operating system, Claude Code version, when each turn starts and stops, the Claude Code session id and when that session started, counts of file extensions in your project directory, which questions you skip, and your answers with how long you took and where you answered them (terminal pane, local page, VS Code, or inside Claude Code)',
     )
   })
 
@@ -63,7 +63,7 @@ describe('the spec 5.5 disclosure lists', () => {
   // one blank phrase would let that surface drop the item entirely.
   it('gives every item a non-blank phrase', () => {
     const all = [...DISCLOSURE.sent, ...DISCLOSURE.derived, ...DISCLOSURE.never]
-    expect(all.length).toBe(14)
+    expect(all.length).toBe(16)
     for (const item of all) expect(item.phrase.trim(), `${item.key} has a blank phrase`).not.toBe('')
   })
 

@@ -228,7 +228,7 @@ export function quoteFor(d: StudyDraft, firstStudyUsed: boolean) {
   const targeted = targetingOf(d) !== undefined
   const atCost = !firstStudyUsed
   const q = quoteStudy({ targeted, atCost })
-  return { priceCents: q.priceCents, developerCents: q.developerCents, targeted, atCost, holdCents: q.priceCents * d.questions.length * Number(d.targetCount) }
+  return { priceCents: q.priceCents, developerCents: q.developerCents, targeted, atCost, questions: d.questions.length, respondents: Number(d.targetCount), holdCents: q.priceCents * d.questions.length * Number(d.targetCount) }
 }
 
 /**
@@ -253,7 +253,7 @@ export function quoteForSaved(
   const targeted = isTargeted(s.targeting)
   const atCost = !firstStudyUsed
   const q = quoteStudy({ targeted, atCost })
-  return { priceCents: q.priceCents, developerCents: q.developerCents, targeted, atCost, holdCents: q.priceCents * s.questions.length * s.target_count }
+  return { priceCents: q.priceCents, developerCents: q.developerCents, targeted, atCost, questions: s.questions.length, respondents: s.target_count, holdCents: q.priceCents * s.questions.length * s.target_count }
 }
 
 /**

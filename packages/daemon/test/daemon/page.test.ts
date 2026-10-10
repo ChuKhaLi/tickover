@@ -157,6 +157,10 @@ describe('localhost page', () => {
         'tabs\tand\nnewlines',
         'x'.repeat(500),
         'plain text',
+        // Audit C3 (R917): isolates, the Arabic letter mark, Mongolian vowel separator, Hangul
+        // fillers and tag characters, one by one so a class missing any of them diverges here.
+        ...[0x2066, 0x2067, 0x2068, 0x2069, 0x061c, 0x180e, 0x3164, 0xffa0, 0xe0000, 0xe0041, 0xe007f]
+          .map((cp) => `in${String.fromCodePoint(cp)}visible`),
       ]) {
         expect(sanitizeField(raw, RULES.QUESTION_TEXT_MAX)).toBe(sanitizeText(raw, RULES.QUESTION_TEXT_MAX))
         expect(sanitizeField(raw, RULES.OPTION_TEXT_MAX)).toBe(sanitizeText(raw, RULES.OPTION_TEXT_MAX))

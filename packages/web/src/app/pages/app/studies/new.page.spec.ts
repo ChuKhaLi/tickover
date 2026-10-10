@@ -231,8 +231,28 @@ describe('NewStudyPage', () => {
   // targeting, not the 50c `PRICING.TARGETING_CENTS` names. The buyers page prices
   // both branches; this form quotes the branch in front of it.
   it('names the targeting surcharge the buyer in front of it would pay', async () => {
-    expect((await mount({ first_study_used: false })).text()).toContain('Targeting (+$0.25 per response)')
-    expect((await mount({ first_study_used: true })).text()).toContain('Targeting (+$0.50 per response)')
+    expect((await mount({ first_study_used: false })).text()).toContain('Targeting (+$0.25 per answer)')
+    expect((await mount({ first_study_used: true })).text()).toContain('Targeting (+$0.50 per answer)')
+  })
+
+  // R907. The panel showed the right total under "Hold at submit", beside a unit price labelled
+  // "Per valid response" -- so a buyer with two questions read $1.00 a respondent and a total
+  // twice what that implies. Each row is read on its own: the label beside the unit price, the
+  // multiplier, and the total labelled as what the study costs.
+  it('labels the running total as the study total, with the multiplication that makes it', async () => {
+    const { fixture, el } = await mount({ first_study_used: true })
+    await fillValid(fixture, el)
+    button(el, '+ Add question').click()
+    typeInto(el, 'input[name=target]', '100')
+    await settle(fixture)
+    const row = (label: string) => {
+      const dt = Array.from(el.querySelectorAll('aside dt')).find((d) => d.textContent?.trim() === label)
+      expect(dt, `no quote row labelled "${label}"`).toBeTruthy()
+      return dt!.nextElementSibling!.textContent!.replace(/\s+/g, ' ').trim()
+    }
+    expect(row('Per valid answer, each question')).toBe('$1.00')
+    expect(row('Questions × respondents')).toBe('2 × 100')
+    expect(row('Study total, held at submit')).toBe('$200.00')
   })
 
   it('shows the review policy the study will be judged against', async () => {

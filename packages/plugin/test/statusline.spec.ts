@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process'
 import http from 'node:http'
 import net from 'node:net'
 import type { AddressInfo } from 'node:net'
-import { mkdtempSync, writeFileSync, readFileSync, existsSync, readdirSync, mkdirSync, utimesSync } from 'node:fs'
+import { mkdtempSync, writeFileSync, readFileSync, existsSync, readdirSync, mkdirSync, utimesSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
@@ -66,14 +66,23 @@ async function fakeDaemon(line: string) {
 // Measured while making the change, because it is not what the bounds look like they do: with the
 // 1400ms hard stop in place, most of these upper bounds are the SECOND thing to notice a break.
 // Deleting the wrapped command's kill, and widening the fetch abort from 1000ms to 9000ms, both go
-// red on stdout first -- the hard stop fires and the line comes back empty. The one upper bound
-// that catches a mutation alone is the concurrency bound: awaiting the two in series instead of
-// Promise.all leaves stdout correct and shows up only as 1464ms. The lower bounds are the other
-// assertions here that carry a claim of their own -- without them an implementation that gave up
-// instantly would pass. The rest are defence in depth against the hard stop itself regressing,
-// which is worth keeping and is not worth mistaking for the primary guard.
-let baseNoWrap = 0
-let baseWrap = 0
+// red on stdout first -- the hard stop fires and the line comes back empty. The concurrency claim,
+// once the one upper bound that caught a mutation alone, is now proven by the order of events
+// rather than a total (R922), and so is "the first slow render does not wait for its background
+// run". The lower bounds are the other assertions here that carry a claim of their own -- without
+// them an implementation that gave up instantly would pass. The rest are defence in depth against
+// the hard stop itself regressing, which is worth keeping and is not worth mistaking for the
+// primary guard. Measured 2026-10-09: the `< baseline + 800` bound on the refused-port fallback did
+// not catch a 1000ms sleep added before the fetch, before or after R922, under ~70% CPU load.
+//
+// What no test here can absorb: a machine so loaded that the script's OWN budgets are blown. An
+// empty stdout means the 1400ms hard stop fired inside the script -- seen with nothing but `echo`
+// wrapped, at 70-90% CPU from parallel suites -- and that is the product degrading as designed,
+// not a bound that is too tight.
+let baseNoWrapAtStart = 0
+let baseWrapAtStart = 0
+let plainBaseHome = ''
+let wrappedBaseHome = ''
 
 async function slowestOfThree(f: () => Promise<{ ms: number }>) {
   let worst = 0
@@ -81,15 +90,33 @@ async function slowestOfThree(f: () => Promise<{ ms: number }>) {
   return worst
 }
 
+// The baseline as of NOW, not only as of beforeAll (R922). Load is bursty: a baseline taken while
+// the machine was quiet and a timed run taken a minute later while another suite was starting
+// Node processes measured two different machines -- a 1929ms render against a 1901ms bound was
+// exactly that, with nothing wrong. So each bound uses the slower of the suite-start baseline and
+// one fresh baseline run taken right before the timed run. Only ever larger, and only by what the
+// machine is measurably costing right now; the margin each bound adds on top, which is what carries
+// its claim, is unchanged.
+async function baseNoWrap(): Promise<number> {
+  return Math.max(baseNoWrapAtStart, (await run(plainBaseHome)).ms)
+}
+async function baseWrap(): Promise<number> {
+  // A baseline run that missed the 1000ms budget leaves a slow-command cache behind, and every
+  // later one would be served from it without starting the nested Node at all -- a baseline that
+  // got faster precisely because the machine was slow.
+  rmSync(join(wrappedBaseHome, 'wrapped'), { recursive: true, force: true })
+  return Math.max(baseWrapAtStart, (await run(wrappedBaseHome)).ms)
+}
+
 beforeAll(async () => {
   // No daemon.json: the script prints the daemon-off line without a fetch, so what is left is
   // process start plus parse plus one config read.
-  const plain = mkdtempSync(join(tmpdir(), 'mw-sl-base-'))
-  baseNoWrap = await slowestOfThree(() => run(plain))
+  plainBaseHome = mkdtempSync(join(tmpdir(), 'mw-sl-base-'))
+  baseNoWrapAtStart = await slowestOfThree(() => run(plainBaseHome))
   // The same, plus a wrapped command that starts Node and exits without writing anything.
-  const wrapped = mkdtempSync(join(tmpdir(), 'mw-sl-base-'))
-  writeFileSync(join(wrapped, 'config.json'), JSON.stringify({ wrappedStatusLine: { type: 'command', command: `node -e ""` } }))
-  baseWrap = await slowestOfThree(() => run(wrapped))
+  wrappedBaseHome = mkdtempSync(join(tmpdir(), 'mw-sl-base-'))
+  writeFileSync(join(wrappedBaseHome, 'config.json'), JSON.stringify({ wrappedStatusLine: { type: 'command', command: `node -e ""` } }))
+  baseWrapAtStart = await slowestOfThree(() => run(wrappedBaseHome))
 }, 60_000)
 
 describe('statusline.mjs', () => {
@@ -101,7 +128,7 @@ describe('statusline.mjs', () => {
     expect(r.status).toBe(0)
     expect(r.stdout).toBe('tickover · today 1/10 · balance $0.50')
     // A loopback fetch that answers at once: nothing but startup should be on the clock.
-    expect(r.ms).toBeLessThan(baseNoWrap + 500)
+    expect(r.ms).toBeLessThan(await baseNoWrap() + 500)
     expect(d.urls[0]).toBe('/v1/status?session_id=s1&version=2.1.90')
     await d.close()
   })
@@ -128,11 +155,14 @@ describe('statusline.mjs', () => {
     const home = mkdtempSync(join(tmpdir(), 'mw-sl-'))
     expect((await run(home)).stdout).toBe('tickover · daemon off · run: tickover status')
     writeFileSync(join(home, 'daemon.json'), JSON.stringify({ port: 1, token: 'tok', pid: 1, startedAt: '' }))
-    writeFileSync(join(home, 'config.json'), JSON.stringify({ wrappedStatusLine: { type: 'command', command: `node -e "process.stdout.write('only original')"` } }))
+    // A shell builtin, not `node -e` (R922): the claim needs a command that prints, nothing more, and
+    // a nested Node start under load ate the whole 1000ms budget, killing the "original" this test
+    // is about. `echo` prints the same text under cmd and sh; the script trims the line ending.
+    writeFileSync(join(home, 'config.json'), JSON.stringify({ wrappedStatusLine: { type: 'command', command: 'echo only original' } }))
     const r = await run(home)
     expect(r.stdout).toBe('only original')
     // Port 1 refuses immediately, so this path has no budget of its own to spend either.
-    expect(r.ms).toBeLessThan(baseWrap + 800)
+    expect(r.ms).toBeLessThan(await baseNoWrap() + 800)
   })
 
   it('does not hang when the daemon accepts the connection but never responds', async () => {
@@ -150,7 +180,7 @@ describe('statusline.mjs', () => {
     // command to fall back to the developer would otherwise get a blank line and no diagnostic.
     expect(r.stdout).toBe(DAEMON_OFF)
     expect(r.ms).toBeGreaterThanOrEqual(900)
-    expect(r.ms).toBeLessThan(baseNoWrap + 1400)
+    expect(r.ms).toBeLessThan(await baseNoWrap() + 1400)
     // See notify.spec.ts's equivalent test: the accepted-and-ignored socket must be destroyed
     // before server.close(), or its callback (which waits for every connection to end) hangs.
     for (const s of sockets) s.destroy()
@@ -159,22 +189,43 @@ describe('statusline.mjs', () => {
 
   it('runs the wrapped command and the daemon fetch concurrently, not summed', async () => {
     // A daemon that never answers (forces the full ~1000ms fetch abort) alongside a wrapped
-    // command that takes ~600ms on its own. In series that would be ~1600ms; run together it
-    // must land close to the slower of the two, not their sum.
+    // command that waits WAIT ms after it starts. Concurrency is proven by the ORDER of events,
+    // not by the total (R922): this used to bound the elapsed time at baseline + 1300 against a
+    // serial 1600, with a 600ms fixture -- and on a loaded machine the nested Node start alone
+    // pushed that fixture past its own 1000ms budget, so the wrapped line was killed and the test
+    // went red with nothing wrong (3 of 5 runs under a 10-thread CPU load). Timestamps from the
+    // same clock say the same thing at any load:
+    //   - the fetch connected before the wrapped command could have finished -> not wrapped-then-fetch;
+    //   - the wrapped command started before the fetch gave up -> not fetch-then-wrapped.
+    const WAIT = 100
     const sockets = new Set<import('node:net').Socket>()
-    const server = net.createServer((socket) => { sockets.add(socket); socket.on('close', () => sockets.delete(socket)) })
+    let connectedAt: number | undefined
+    let abortedAt: number | undefined
+    const server = net.createServer((socket) => {
+      connectedAt ??= Date.now()
+      // A process that dies mid-request resets the socket; that must fail an assertion, not
+      // surface as an unhandled 'error' on the test process.
+      socket.on('error', () => {})
+      sockets.add(socket)
+      socket.on('close', () => { abortedAt ??= Date.now(); sockets.delete(socket) })
+    })
     await new Promise<void>((r) => server.listen(0, '127.0.0.1', r))
     const port = (server.address() as AddressInfo).port
     const home = mkdtempSync(join(tmpdir(), 'mw-sl-'))
+    const startedFile = join(home, 'wrapped-started.txt')
     writeFileSync(join(home, 'daemon.json'), JSON.stringify({ port, token: 'tok', pid: 1, startedAt: '' }))
-    writeFileSync(join(home, 'config.json'), JSON.stringify({ wrappedStatusLine: { type: 'command', command: `node -e "setTimeout(() => process.stdout.write('slow orig'), 600)"` } }))
+    const started = JSON.stringify(startedFile).replace(/"/g, '\\"')
+    writeFileSync(join(home, 'config.json'), JSON.stringify({ wrappedStatusLine: { type: 'command', command: `node -e "require('fs').writeFileSync(${started},String(Date.now()));setTimeout(() => process.stdout.write('slow orig'), ${WAIT})"` } }))
     const r = await run(home)
     expect(r.status).toBe(0)
+    // Both results were used: the wrapped line survived a fetch that ran its full budget.
     expect(r.stdout).toBe('slow orig')
+    // The fetch really waited for its abort; a render that gave up at once would pass the rest.
     expect(r.ms).toBeGreaterThanOrEqual(900)
-    // Well under 600 + 1000: proves the two ran together rather than one after the other. The
-    // margin that carries the claim is the 300ms between this bound and a serial 1600.
-    expect(r.ms).toBeLessThan(baseWrap + 1300)
+    const wrappedStartedAt = Number(readFileSync(startedFile, 'utf8'))
+    expect(connectedAt, 'the status fetch connected').toBeDefined()
+    expect(connectedAt!).toBeLessThan(wrappedStartedAt + WAIT)
+    expect(wrappedStartedAt).toBeLessThan(abortedAt!)
     for (const s of sockets) s.destroy()
     await new Promise<void>((r2) => server.close(() => r2()))
   })
@@ -206,13 +257,21 @@ describe('statusline.mjs', () => {
 
       const first = await run(home)
       expect(first.stdout).toBe('tickover · today 1/10 · balance $0.50')
-      expect(first.ms).toBeLessThan(baseWrap + 1400)
+      // The render did not wait for the background run it started: that run cannot have written
+      // its result yet. Ordering rather than `first.ms < baseline + 1400` (R922), which went red at
+      // 2948ms under load with nothing wrong -- the kill and the detached spawn are two more
+      // process starts the baseline does not contain. A render that waited would land after the
+      // command's own 1500ms, and so after the cache, at any load.
+      expect(cached(home)).toBe(false)
 
       expect(await until(() => cached(home), 8000)).toBe(true)
+      const before = readFileSync(counter, 'utf8').length
       const later = await run(home)
       expect(later.stdout).toBe('orig slow\ntickover · today 1/10 · balance $0.50')
-      // Served from the cache: no wrapped command on the clock at all.
-      expect(later.ms).toBeLessThan(baseWrap + 500)
+      // Served from the cache: the developer's command did not run for this render at all. Counted
+      // rather than timed, for the same reason.
+      expect(readFileSync(counter, 'utf8').length).toBe(before)
+      expect(later.ms).toBeLessThan(await baseWrap() + 500)
       await d.close()
     }, 20_000)
 
@@ -353,13 +412,22 @@ describe('statusline.mjs', () => {
     // starts a background run of the same command (R701), and one that never ends outlived the
     // test by 15s -- a leaked process the whole-branch review found (I5) and a likely source of this
     // file's timing flakes.
-    writeFileSync(join(home, 'config.json'), JSON.stringify({ wrappedStatusLine: { type: 'command', command: `node -e "setTimeout(() => {}, 3000)"` } }))
+    const startLog = join(home, 'hang-started.txt')
+    const log = JSON.stringify(startLog).replace(/"/g, '\\"')
+    writeFileSync(join(home, 'config.json'), JSON.stringify({ wrappedStatusLine: { type: 'command', command: `node -e "require('fs').appendFileSync(${log},Date.now()+'\\n');setTimeout(() => {}, 3000)"` } }))
     const r = await run(home)
+    const endedAt = Date.now()
     expect(r.status).toBe(0)
     // The wrapped command never produced output and was killed, so only the daemon line prints.
     expect(r.stdout).toBe('tickover · today 1/10 · balance $0.50')
     expect(r.ms).toBeGreaterThanOrEqual(900)
-    expect(r.ms).toBeLessThan(baseWrap + 1400)
+    // The render ended before the command would have ended on its own (R922): ordering, where this
+    // was `ms < baseline + 1400` and went red at 3265ms under load -- the kill and the background
+    // spawn are process starts the baseline does not contain. The first line is the render's own
+    // run; a later one is the background run. No line at all means it was killed before it even
+    // started, which cannot be waiting for it either.
+    const firstStart = existsSync(startLog) ? Number(readFileSync(startLog, 'utf8').split('\n')[0]) : Infinity
+    expect(endedAt).toBeLessThan(firstStart + 3000)
     await d.close()
   })
 
@@ -376,7 +444,9 @@ describe('statusline.mjs', () => {
     writeFileSync(join(home, 'daemon.json'), JSON.stringify({ port: d.port, token: 'tok', pid: 1, startedAt: '' }))
     // Exits immediately without ever reading stdin, so its end of the pipe is gone while
     // statusline.mjs is still writing 70 KB into it.
-    writeFileSync(join(home, 'config.json'), JSON.stringify({ wrappedStatusLine: { type: 'command', command: `node -e "process.stdout.write('orig')"` } }))
+    // `echo` rather than `node -e` (R922): it ignores stdin just the same and exits sooner, which
+    // makes the EPIPE more likely, not less -- and it cannot miss the 1000ms budget on a loaded box.
+    writeFileSync(join(home, 'config.json'), JSON.stringify({ wrappedStatusLine: { type: 'command', command: 'echo orig' } }))
 
     const big = { ...input, padding: 'p'.repeat(70_000) }
     expect(JSON.stringify(big).length).toBeGreaterThan(65_536)
@@ -408,7 +478,7 @@ describe('statusline.mjs', () => {
     expect(result.status).toBe(0)
     expect(stdout).toBe('')
     // Bounded near the 1400ms hard stop, not vitest's much larger test timeout.
-    expect(result.ms).toBeLessThan(baseNoWrap + 1800)
+    expect(result.ms).toBeLessThan(await baseNoWrap() + 1800)
   })
 })
 
@@ -467,7 +537,7 @@ describe('statusline.mjs stale daemon', () => {
     // falls back to the original ALONE. The notice is for when falling back leaves nothing at all.
     const home = mkdtempSync(join(tmpdir(), 'mw-sl-'))
     writeFileSync(join(home, 'daemon.json'), JSON.stringify({ port: 49999, token: 'tok', pid: 1, startedAt: '' }))
-    writeFileSync(join(home, 'config.json'), JSON.stringify({ wrappedStatusLine: { type: 'command', command: `node -e "process.stdout.write('orig')"` } }))
+    writeFileSync(join(home, 'config.json'), JSON.stringify({ wrappedStatusLine: { type: 'command', command: 'echo orig' } }))
     expect((await run(home)).stdout).toBe('orig')
   })
 

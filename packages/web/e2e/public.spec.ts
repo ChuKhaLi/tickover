@@ -30,11 +30,11 @@ test('a developer lands, takes the developer card, and joins the waitlist', asyn
   // along on a page with two audiences.
   await expect(page.getByRole('heading', { name: 'This line is the product.', level: 1 })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Earn while Claude thinks', level: 2 })).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Ask 300 AI-native developers one question', level: 2 })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Ask AI-native developers while their agent works', level: 2 })).toBeVisible()
 
   // The two paths are no longer two clickable cards; each ends in its own call to
   // action. This one is the developer's.
-  const developerPath = page.getByRole('link', { name: 'Join the waitlist' })
+  const developerPath = page.getByRole('link', { name: 'Install the plugin' })
   await expect(developerPath).toBeVisible()
   await developerPath.click()
 
@@ -171,13 +171,13 @@ test('a buyer lands, takes the buyer card, and reads the price table', async ({ 
 
   await page.getByRole('link', { name: /For buyers/ }).click()
   await expect(page).toHaveURL('/buyers')
-  await expect(page.getByRole('heading', { name: 'Ask 300 AI-native developers one question' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Ask AI-native developers while their agent works' })).toBeVisible()
 
   // Every figure is asked of the contract, never typed in (R49): moving
   // `PRICING.BASE_CENTS` has to move the page, and a page that stopped agreeing
   // with the contract is a money defect on the artifact that sells the product.
   const table = page.getByRole('table')
-  await expect(table.getByRole('row', { name: /Per valid response/ })).toContainText(formatCents(full.priceCents))
+  await expect(table.getByRole('row', { name: /Per valid answer to each question/ })).toContainText(formatCents(full.priceCents))
   await expect(table.getByRole('row', { name: /With targeting/ })).toContainText(
     formatCents(PRICING.TARGETING_CENTS),
   )
@@ -204,7 +204,31 @@ test('the buyers waitlist link stays on the buyers page', async ({ page }) => {
   await page.getByRole('link', { name: 'ask us to tell you when the first studies run' }).click()
 
   await expect(page).toHaveURL('/buyers#waitlist')
-  await expect(page.getByRole('heading', { name: 'Ask 300 AI-native developers one question' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Ask AI-native developers while their agent works' })).toBeVisible()
+})
+
+// The landing page's data-boundary link went to /data, which shows aggregates and none of the
+// three lists. It now lands on the heading that carries them, and the browser is the only place
+// that shows whether a cross-route fragment link scrolls there.
+test('the landing data-boundary link lands on the lists on /developers', async ({ page }) => {
+  await mockApi(page)
+  await page.goto('/')
+
+  await page.getByRole('link', { name: 'What leaves your machine' }).click()
+
+  await expect(page).toHaveURL('/developers#what-leaves')
+  await expect(page.getByRole('heading', { name: 'What leaves your machine' })).toBeInViewport()
+})
+
+// R910: the founding block's terms link lands on the arrangement in the buyer terms.
+test('the founding block links to the founding arrangement in the buyer terms', async ({ page }) => {
+  await mockApi(page)
+  await page.goto('/buyers')
+
+  await page.locator('#founding').getByRole('link', { name: 'buyer terms' }).click()
+
+  await expect(page).toHaveURL('/terms/buyers#founding')
+  await expect(page.getByRole('heading', { name: 'Founding buyers' })).toBeInViewport()
 })
 
 test('the data page draws a bar per option from the aggregates it is served', async ({ page }) => {
@@ -874,7 +898,7 @@ test('an unknown path is served the shell, and the app renders its own not-found
   // the heading coming back alone is exactly the state this replaced.
   await expect(page.getByRole('link', { name: 'What Tickover is' })).toBeVisible()
   await expect(page.getByRole('link', { name: /Get paid to answer/ })).toBeVisible()
-  await expect(page.getByRole('link', { name: /Ask 300 AI-native developers/ })).toBeVisible()
+  await expect(page.getByRole('link', { name: /Ask AI-native developers while/ })).toBeVisible()
   await expect(page.locator('header').getByRole('link', { name: 'For buyers' })).toBeVisible()
 
   // And they go somewhere: a route out that 404s again is not a route out.

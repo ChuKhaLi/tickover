@@ -41,7 +41,13 @@ export const DISCLOSURE: {
     { key: 'os', phrase: 'operating system' },
     { key: 'tool_version', phrase: 'Claude Code version' },
     { key: 'turn_times', phrase: 'when each turn starts and stops' },
+    // R909: both were sent from the first release and listed nowhere. The daemon puts the
+    // session id and session start on every question request (question-loop.ts, NextRequest)
+    // and posts the assignment id of every skip (server-client.ts skip) -- spec 5.5 says the
+    // consent screen lists "exactly" what leaves the machine, so a list missing them was false.
+    { key: 'session', phrase: 'the Claude Code session id and when that session started' },
     { key: 'language_mix', phrase: 'counts of file extensions in your project directory' },
+    { key: 'skips', phrase: 'which questions you skip' },
     { key: 'answers', phrase: 'your answers with how long you took and where you answered them (terminal pane, local page, VS Code, or inside Claude Code)' },
   ],
 
